@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Display Calibrator
+Name[ja]=ディスプレイ調整
+Comment=Match stripes and circles to correct your display's colors
+Comment[ja]=縞模様と円を見比べて、画面の色を整えます
+Exec=snowlinux-display-calibrator
+Icon=snowlinux-pref-color
+Terminal=false
+Categories=Settings;
+Keywords=color;gamma;calibrate;icc;色;ガンマ;調整;

@@ -34,7 +34,7 @@ GROUPS = [
     ]),
     ("ハードウェア", [
         ("display", "ディスプレイ", ("embed", ["xfce4-display-settings"]), "解像度 明るさ 画面 モニター"),
-        ("color", "カラー", ("embed", ["xfce4-color-settings"]), "色 プロファイル icc 調整 ガンマ"),
+        ("color", "カラー", ("app", ["snowlinux-display-calibrator"]), "色 プロファイル icc 調整 ガンマ キャリブレーション 較正"),
         ("keyboard", "キーボード", ("embed", ["xfce4-keyboard-settings"]), "ショートカット キー 配列"),
         ("mouse", "マウスと\nトラックパッド", ("embed", ["xfce4-mouse-settings"]), "ポインター スクロール タップ"),
         ("sound", "サウンド", ("app", ["pavucontrol"]), "音量 スピーカー マイク 入力 出力"),

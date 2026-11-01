@@ -64,6 +64,8 @@ install -D -m 644 "$root/config/system/applications/snowlinux-system-preferences
 
 # ランチャー (Spotlight 風)。rofi はすでに入っている
 install -m 755 "$root/scripts/snowlinux-spotlight" /usr/local/bin/snowlinux-spotlight
+install -m 755 "$root/scripts/snowlinux-display-calibrator" /usr/local/bin/snowlinux-display-calibrator
+install -D -m 644 "$root/config/system/applications/snowlinux-display-calibrator.desktop" /usr/local/share/applications/snowlinux-display-calibrator.desktop
 
 # 「アプリケーション」フォルダ (システム全体で共通。実際のインストールでは、パッケージの更新のたびに作り直す)
 python3 "$root/scripts/gen-applications-folder.py" /Applications

@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=SnowLinux: apply display calibration
+Exec=snowlinux-display-calibrator --apply
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

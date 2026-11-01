@@ -1,0 +1,611 @@
+#!/usr/bin/env python3
+"""SnowLinux ディスプレイ調整
+
+縞模様と、ベタの円を見比べて、赤・緑・青それぞれのガンマを測る。
+測った結果から補正曲線を作り、ICC プロファイルとして保存して、画面に反映する。
+
+  snowlinux-display-calibrator            調整を始める
+  snowlinux-display-calibrator --apply    保存した調整を画面に反映する (ログイン時に自動で実行)
+  snowlinux-display-calibrator --reset    調整を外して、元の表示に戻す (履歴は残る)
+
+考え方:
+  縞は「最大の明るさ」と「黒」の行を、決まった割合で並べたもの。目には平均の明るさ
+  (25% / 50% / 75%) に見える。ベタの円の値を動かして、縞と同じ明るさに見える所を探す。
+  円の値 v で明るさが f になったなら、画面の特性は  f = v^g  なので  g = ln f / ln v。
+  補正は  v = x^(T/g)  (T は目標のガンマ)。xrandr の --gamma には g/T を渡す。
+"""
+import argparse
+import datetime
+import json
+import math
+import os
+import re
+import struct
+import subprocess
+import sys
+
+CONFIG = os.path.expanduser("~/.config/snowlinux/display-calibration.json")
+ICC_DIR = os.path.expanduser("~/.local/share/icc")
+
+LEVELS = [0.25, 0.50, 0.75]          # 縞の明るさ (割合)
+CHANNELS = [("赤", (1, 0, 0)), ("緑", (0, 1, 0)), ("青", (0, 0, 1))]
+TARGETS = [("2.2  標準 (Windows・いまの Mac)", 2.2), ("2.0  やや明るめ", 2.0), ("1.8  むかしの Mac", 1.8)]
+G_MIN, G_MAX = 1.0, 4.0
+
+
+# ---------------------------------------------------------------- 計算
+
+def gamma_from_match(f, v):
+    """縞の明るさ f と、一致したベタの値 v (0..1) からガンマを出す。"""
+    v = min(max(v, 1 / 255), 254 / 255)
+    return min(max(math.log(f) / math.log(v), G_MIN), G_MAX)
+
+
+def channel_gamma(matches):
+    """3 つの明るさでの結果 [(f, v), ...] から、ガンマを 1 つにまとめる。"""
+    gs = [gamma_from_match(f, v) for f, v in matches]
+    return sum(gs) / len(gs)
+
+
+def correction_curve(g, target, n=256):
+    """画面の特性が x^g のとき、x^target にそろえる曲線 (0..1 の n 個)。"""
+    return [(i / (n - 1)) ** (target / g) for i in range(n)]
+
+
+def xrandr_gamma(gammas, target):
+    return [g / target for g in gammas]
+
+
+# ---------------------------------------------------------------- ICC プロファイル
+
+def _s15(x):
+    return struct.pack(">i", int(round(x * 65536)))
+
+
+def _xyz(x, y, z):
+    return b"XYZ \0\0\0\0" + _s15(x) + _s15(y) + _s15(z)
+
+
+def _text_desc(s):
+    a = s.encode("ascii", "replace") + b"\0"
+    return (b"desc\0\0\0\0" + struct.pack(">I", len(a)) + a
+            + struct.pack(">II", 0, 0) + struct.pack(">HB", 0, 0) + b"\0" * 67)
+
+
+def _text(s):
+    return b"text\0\0\0\0" + s.encode("ascii", "replace") + b"\0"
+
+
+def _curv_gamma(g):
+    return b"curv\0\0\0\0" + struct.pack(">IH", 1, int(round(g * 256)))
+
+
+def _vcgt(curves):
+    n = len(curves[0])
+    data = b"vcgt\0\0\0\0" + struct.pack(">IHHH", 0, 3, n, 2)
+    for c in curves:
+        data += b"".join(struct.pack(">H", int(round(min(max(v, 0), 1) * 65535))) for v in c)
+    return data
+
+
+def build_icc(description, gammas, target):
+    """sRGB の原色と目標ガンマに、補正曲線 (vcgt) を付けた、ディスプレイ用プロファイル (ICC v2)。"""
+    tags = [
+        (b"desc", _text_desc(description)),
+        (b"cprt", _text("Public domain. Made by SnowLinux Display Calibrator")),
+        (b"wtpt", _xyz(0.9642, 1.0, 0.8249)),
+        (b"rXYZ", _xyz(0.4360747, 0.2225045, 0.0139322)),
+        (b"gXYZ", _xyz(0.3850649, 0.7168786, 0.0971045)),
+        (b"bXYZ", _xyz(0.1430804, 0.0606169, 0.7141733)),
+        (b"rTRC", _curv_gamma(target)),
+        (b"gTRC", _curv_gamma(target)),
+        (b"bTRC", _curv_gamma(target)),
+        (b"vcgt", _vcgt([correction_curve(g, target) for g in gammas])),
+    ]
+    off = 128 + 4 + 12 * len(tags)
+    table, body = b"", b""
+    for sig, data in tags:
+        pad = (-len(data)) % 4
+        table += sig + struct.pack(">II", off + len(body), len(data))
+        body += data + b"\0" * pad
+    size = off + len(body)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    header = struct.pack(">I4sI4s4s4s", size, b"\0\0\0\0", 0x02400000, b"mntr", b"RGB ", b"XYZ ")
+    header += struct.pack(">6H", now.year, now.month, now.day, now.hour, now.minute, now.second)
+    header += b"acsp" + b"\0" * 4 + b"\0" * 4 + b"\0" * 4 + b"\0" * 4 + b"\0" * 8
+    header += struct.pack(">I", 0) + _s15(0.9642) + _s15(1.0) + _s15(0.8249)
+    header += b"\0" * 4 + b"\0" * 16 + b"\0" * 28
+    assert len(header) == 128, len(header)
+    return header + struct.pack(">I", len(tags)) + table + body
+
+
+# ---------------------------------------------------------------- 画面への反映
+
+def primary_output():
+    out = subprocess.run(["xrandr", "--query"], capture_output=True, text=True).stdout
+    names = [m.group(1) for m in re.finditer(r"^(\S+) connected( primary)?", out, re.M)]
+    prim = re.search(r"^(\S+) connected primary", out, re.M)
+    return prim.group(1) if prim else (names[0] if names else None)
+
+
+def set_gamma(output, rgb):
+    if not output or os.environ.get("SNOW_CALIB_DRYRUN"):
+        return False
+    arg = ":".join(f"{x:.4f}" for x in rgb)
+    return subprocess.run(["xrandr", "--output", output, "--gamma", arg]).returncode == 0
+
+
+def load_config():
+    """{"history": [古い順の調整], "active": 使用中の id か None}。むかしの形式も読む。"""
+    try:
+        with open(CONFIG) as f:
+            cfg = json.load(f)
+    except (OSError, ValueError):
+        return {"history": [], "active": None}
+    if "gammas" in cfg:                       # 最初の版の形式
+        e = {"id": "00000000-000000", "date": "", "output": cfg.get("output"), "gammas": cfg["gammas"],
+             "target": cfg["target"], "icc": cfg.get("icc")}
+        return {"history": [e], "active": e["id"]}
+    cfg.setdefault("history", [])
+    cfg.setdefault("active", None)
+    return cfg
+
+
+def write_config(cfg):
+    os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
+    with open(CONFIG, "w") as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=False)
+
+
+def active_entry(cfg):
+    for e in cfg["history"]:
+        if e["id"] == cfg["active"]:
+            return e
+    return None
+
+
+def save_config(output, gammas, target, name=""):
+    """新しい調整を履歴に足して、使用中にする。"""
+    os.makedirs(ICC_DIR, exist_ok=True)
+    now = datetime.datetime.now()
+    eid = now.strftime("%Y%m%d-%H%M%S")
+    icc_path = os.path.join(ICC_DIR, "SnowLinux-%s.icc" % eid)
+    with open(icc_path, "wb") as f:
+        f.write(build_icc("SnowLinux Display %s (gamma %.1f)" % (now.strftime("%Y-%m-%d"), target), gammas, target))
+    cfg = load_config()
+    entry = {"id": eid, "date": now.strftime("%Y-%m-%d %H:%M"), "output": output,
+             "gammas": gammas, "target": target, "icc": icc_path, "name": name}
+    cfg["history"].append(entry)
+    cfg["active"] = eid
+    write_config(cfg)
+    return entry
+
+
+def activate(eid):
+    """履歴の 1 つを使う (None なら調整を外す)。"""
+    cfg = load_config()
+    cfg["active"] = eid
+    write_config(cfg)
+    apply_saved()
+
+
+def rename_entry(eid, name):
+    cfg = load_config()
+    for e in cfg["history"]:
+        if e["id"] == eid:
+            e["name"] = name
+    write_config(cfg)
+
+
+def delete_entry(eid):
+    cfg = load_config()
+    for e in cfg["history"]:
+        if e["id"] == eid and e.get("icc"):
+            try:
+                os.remove(e["icc"])
+            except OSError:
+                pass
+    cfg["history"] = [e for e in cfg["history"] if e["id"] != eid]
+    if cfg["active"] == eid:
+        cfg["active"] = None
+    write_config(cfg)
+    apply_saved()
+
+
+def apply_saved():
+    e = active_entry(load_config())
+    out = (e and e.get("output")) or primary_output()
+    if not e:
+        return 0 if set_gamma(out, [1, 1, 1]) else 1
+    return 0 if set_gamma(out, xrandr_gamma(e["gammas"], e["target"])) else 1
+
+
+def reset_all():
+    """調整を外す (履歴は残す)。"""
+    cfg = load_config()
+    cfg["active"] = None
+    if cfg["history"]:
+        write_config(cfg)
+    set_gamma(primary_output(), [1, 1, 1])
+
+
+# ---------------------------------------------------------------- 画面 (GTK)
+
+def run_gui(screenshot=None):
+    import gi
+    gi.require_version("Gtk", "3.0")
+    gi.require_version("Gdk", "3.0")
+    from gi.repository import Gtk, Gdk, GLib
+    import cairo
+
+    class Calibrator(Gtk.Window):
+        def __init__(self):
+            super().__init__(title="ディスプレイ調整")
+            self.output = primary_output()
+            self.saved = active_entry(load_config())
+            self.step = 0                      # 0 説明, 1..9 見比べ, 10 まとめ
+            self.steps = [(lv, ch) for lv in LEVELS for ch in CHANNELS]
+            self.value = {}                    # (level, channel) -> v (0..1)
+            self.target = 2.2
+            self.set_default_size(760, 680)
+            self.set_position(Gtk.WindowPosition.CENTER)
+            self.connect("delete-event", self.on_quit)
+            self.connect("key-press-event", self.on_key)
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            self.add(box)
+            self.stack = Gtk.Stack()
+            box.pack_start(self.stack, True, True, 0)
+
+            self.stack.add_named(self.build_intro(), "intro")
+            self.area = Gtk.DrawingArea()
+            self.area.connect("draw", self.on_draw)
+            self.area.set_can_focus(False)
+            self.stack.add_named(self.area, "match")
+            self.stack.add_named(self.build_summary(), "summary")
+
+            self.bar = Gtk.Box(spacing=8)
+            self.bar.set_border_width(10)
+            self.back_btn = Gtk.Button(label="戻る")
+            self.back_btn.connect("clicked", lambda *_: self.go(-1))
+            self.next_btn = Gtk.Button(label="続ける")
+            self.next_btn.get_style_context().add_class("suggested-action")
+            self.next_btn.connect("clicked", lambda *_: self.go(1))
+            self.cancel_btn = Gtk.Button(label="キャンセル")
+            self.cancel_btn.connect("clicked", lambda *_: self.on_quit())
+            self.scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 255, 1)
+            self.scale.set_draw_value(False)
+            self.scale.set_hexpand(True)
+            self.scale.connect("value-changed", self.on_scale)
+            self.hint = Gtk.Label()
+            self.hint.set_xalign(0)
+            self.bar.pack_start(self.cancel_btn, False, False, 0)
+            self.bar.pack_start(self.hint, False, False, 6)
+            self.bar.pack_start(self.scale, True, True, 0)
+            self.bar.pack_end(self.next_btn, False, False, 0)
+            self.bar.pack_end(self.back_btn, False, False, 0)
+            box.pack_end(self.bar, False, False, 0)
+            self.show_all()
+            self.show_step()
+
+        # --- ページ
+
+        def build_intro(self):
+            b = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+            b.set_border_width(28)
+            t = Gtk.Label()
+            t.set_markup("<span size='x-large' weight='bold'>ディスプレイ調整へようこそ</span>")
+            t.set_xalign(0)
+            body = Gtk.Label(label=(
+                "縞模様の中に、ベタの円が出ます。少し離れて、目を細めて見て、円が縞と同じ明るさに\n"
+                "見えるところまで、スライダー (← →) を動かしてください。赤・緑・青を、3 つの明るさで\n"
+                "合わせます (全部で 9 回)。Enter で次へ、Backspace で前へ、Esc でやめます。\n"
+                "始める前に、画面を 30 分ほど点けて温め、部屋の明かりが映り込まないようにしてください。"))
+            body.set_xalign(0)
+            body.set_line_wrap(True)
+            b.pack_start(t, False, False, 0)
+            b.pack_start(body, False, False, 0)
+            h = Gtk.Label()
+            h.set_markup("<b>これまでの調整</b>")
+            h.set_xalign(0)
+            b.pack_start(h, False, False, 0)
+            self.hist = Gtk.ListStore(str, str, str, str, str, str, str, str, str)
+            tv = Gtk.TreeView(model=self.hist)
+            self.hist_view = tv
+            for i, title in enumerate(["使用中", "名前", "日付", "目標", "赤", "緑", "青", "前回との差"]):
+                col = Gtk.TreeViewColumn(title, Gtk.CellRendererText(), text=i + 1)
+                tv.append_column(col)
+            tv.get_selection().connect("changed", lambda *_: self.sync_hist_buttons())
+            sw = Gtk.ScrolledWindow()
+            sw.set_shadow_type(Gtk.ShadowType.IN)
+            sw.set_min_content_height(140)
+            sw.add(tv)
+            b.pack_start(sw, True, True, 0)
+            hb = Gtk.Box(spacing=8)
+            self.use_btn = Gtk.Button(label="この調整を使う")
+            self.use_btn.connect("clicked", self.on_use)
+            self.off_btn = Gtk.Button(label="調整を外す")
+            self.off_btn.connect("clicked", self.on_off)
+            self.name_btn = Gtk.Button(label="名前を変える")
+            self.name_btn.connect("clicked", self.on_rename)
+            self.del_btn = Gtk.Button(label="削除")
+            self.del_btn.connect("clicked", self.on_delete)
+            for w in (self.use_btn, self.off_btn, self.name_btn, self.del_btn):
+                hb.pack_start(w, False, False, 0)
+            b.pack_start(hb, False, False, 0)
+            note = Gtk.Label(label="赤・緑・青の数字は、補正する前の、画面そのものの特性 (ガンマ) です。\n"
+                                   "時間がたって数字が動いてきたら、画面が変化している目安になります。")
+            note.set_xalign(0)
+            note.set_line_wrap(True)
+            b.pack_start(note, False, False, 0)
+            return b
+
+        def build_summary(self):
+            b = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+            b.set_border_width(28)
+            t = Gtk.Label()
+            t.set_markup("<span size='x-large' weight='bold'>調整の結果</span>")
+            t.set_xalign(0)
+            b.pack_start(t, False, False, 0)
+            self.result = Gtk.Label()
+            self.result.set_xalign(0)
+            b.pack_start(self.result, False, False, 0)
+            b.pack_start(Gtk.Label(label="目標のガンマ:", xalign=0), False, False, 0)
+            first = None
+            self.radios = []
+            for label, val in TARGETS:
+                r = Gtk.RadioButton.new_with_label_from_widget(first, label)
+                first = first or r
+                r.connect("toggled", self.on_target, val)
+                self.radios.append(r)
+                b.pack_start(r, False, False, 0)
+            b.pack_start(Gtk.Label(label="この調整の名前 (省略できます。例: 買ったとき、1 年後):", xalign=0), False, False, 0)
+            self.name_entry = Gtk.Entry()
+            b.pack_start(self.name_entry, False, False, 0)
+            self.save_note = Gtk.Label(xalign=0)
+            self.save_note.set_line_wrap(True)
+            b.pack_end(self.save_note, False, False, 0)
+            return b
+
+        # --- 流れ
+
+        def refresh_history(self):
+            cfg = load_config()
+            self.saved = active_entry(cfg)
+            self.hist.clear()
+            prev = None
+            rows = []
+            for e in cfg["history"]:
+                g = e["gammas"]
+                if prev:
+                    d = "  ".join("%s %+.2f" % (n, a - b) for n, a, b in zip("赤緑青", g, prev))
+                else:
+                    d = "-"
+                rows.append([e["id"], "●" if e["id"] == cfg["active"] else "", e.get("name", ""), e["date"] or "(日付なし)",
+                             "%.1f" % e["target"], "%.2f" % g[0], "%.2f" % g[1], "%.2f" % g[2], d])
+                prev = g
+            for r in reversed(rows):                  # 新しいものを上に
+                self.hist.append(r)
+            self.sync_hist_buttons()
+
+        def selected_id(self):
+            model, it = self.hist_view.get_selection().get_selected()
+            return model[it][0] if it else None
+
+        def sync_hist_buttons(self):
+            sel = self.selected_id() is not None
+            self.use_btn.set_sensitive(sel)
+            self.del_btn.set_sensitive(sel)
+            self.name_btn.set_sensitive(sel)
+            self.off_btn.set_sensitive(self.saved is not None)
+
+        def on_use(self, *_):
+            eid = self.selected_id()
+            if eid:
+                activate(eid)
+                self.refresh_history()
+
+        def on_off(self, *_):
+            activate(None)
+            self.refresh_history()
+
+        def on_rename(self, *_):
+            eid = self.selected_id()
+            if not eid:
+                return
+            cur = next(e.get("name", "") for e in load_config()["history"] if e["id"] == eid)
+            d = Gtk.Dialog(title="名前を変える", transient_for=self, modal=True)
+            d.add_button("キャンセル", Gtk.ResponseType.CANCEL)
+            d.add_button("OK", Gtk.ResponseType.OK)
+            d.set_default_response(Gtk.ResponseType.OK)
+            ent = Gtk.Entry(text=cur, activates_default=True, width_chars=32)
+            ent.set_margin_start(16); ent.set_margin_end(16); ent.set_margin_top(16); ent.set_margin_bottom(8)
+            d.get_content_area().add(ent)
+            d.show_all()
+            if d.run() == Gtk.ResponseType.OK:
+                rename_entry(eid, ent.get_text().strip())
+                self.refresh_history()
+            d.destroy()
+
+        def on_delete(self, *_):
+            eid = self.selected_id()
+            if eid:
+                delete_entry(eid)
+                self.refresh_history()
+
+        def show_step(self):
+            s = self.step
+            self.back_btn.set_sensitive(s > 0)
+            if s == 0:
+                self.unfullscreen()
+                self.resize(760, 680)
+                self.stack.set_visible_child_name("intro")
+                self.scale.hide()
+                self.hint.set_text("")
+                self.next_btn.set_label("続ける")
+                self.refresh_history()
+            elif s <= len(self.steps):
+                if s == 1:
+                    set_gamma(self.output, [1, 1, 1])     # 測るあいだは、補正を外す
+                    if not os.environ.get("SNOW_CALIB_DRYRUN"):
+                        self.fullscreen()
+                lv, ch = self.steps[s - 1]
+                self.stack.set_visible_child_name("match")
+                self.scale.show()
+                key = (lv, ch[0])
+                v = self.value.get(key, lv)               # 最初は、わざと素直な位置から
+                self.scale.set_value(round(v * 255))
+                self.hint.set_text("%d / %d   %s   明るさ %d%%" % (s, len(self.steps), ch[0], round(lv * 100)))
+                self.next_btn.set_label("続ける")
+                self.area.queue_draw()
+            else:
+                self.unfullscreen()
+                self.resize(760, 680)
+                self.compute()
+                self.stack.set_visible_child_name("summary")
+                self.scale.hide()
+                self.hint.set_text("")
+                self.next_btn.set_label("保存して終わる")
+
+        def go(self, d):
+            if self.step == len(self.steps) + 1 and d > 0:
+                self.finish()
+                return
+            self.step = max(0, self.step + d)
+            self.show_step()
+
+        def compute(self):
+            self.gammas = []
+            for name, _ in CHANNELS:
+                ms = [(lv, self.value.get((lv, name)) or lv) for lv in LEVELS]
+                self.gammas.append(channel_gamma(ms))
+            self.apply_preview()
+
+        def apply_preview(self):
+            set_gamma(self.output, xrandr_gamma(self.gammas, self.target))
+            g = self.gammas
+            self.result.set_text(
+                "測ったガンマ:  赤 %.2f   緑 %.2f   青 %.2f\n"
+                "(青や赤だけ大きく違うと、白に色がついて見えていたということです)" % tuple(g))
+            self.save_note.set_text("「保存して終わる」で、ICC プロファイルを保存し、次のログインからも自動で反映します。")
+
+        def on_target(self, radio, val):
+            if radio.get_active():
+                self.target = val
+                self.apply_preview()
+
+        def finish(self):
+            e = save_config(self.output, self.gammas, self.target, self.name_entry.get_text().strip())
+            set_gamma(self.output, xrandr_gamma(e["gammas"], e["target"]))
+            Gtk.main_quit()
+
+        def on_quit(self, *_):
+            # やめたら、前に保存した調整にもどす
+            apply_saved()
+            Gtk.main_quit()
+            return False
+
+        # --- 入力
+
+        def on_scale(self, scale):
+            if 1 <= self.step <= len(self.steps):
+                lv, ch = self.steps[self.step - 1]
+                self.value[(lv, ch[0])] = scale.get_value() / 255
+                self.area.queue_draw()
+
+        def on_key(self, _w, ev):
+            k = ev.keyval
+            matching = 1 <= self.step <= len(self.steps)
+            if k == Gdk.KEY_Escape:
+                self.on_quit()
+            elif k in (Gdk.KEY_Return, Gdk.KEY_KP_Enter, Gdk.KEY_space):
+                self.go(1)
+            elif k == Gdk.KEY_BackSpace:
+                self.go(-1)
+            elif matching:
+                step = {Gdk.KEY_Left: -1, Gdk.KEY_Down: -1, Gdk.KEY_Right: 1, Gdk.KEY_Up: 1,
+                        Gdk.KEY_Page_Down: -8, Gdk.KEY_Page_Up: 8}.get(k)
+                if step:
+                    self.scale.set_value(self.scale.get_value() + step)
+                else:
+                    return False
+            else:
+                return False
+            return True
+
+        # --- 描画: 縞と円
+
+        def on_draw(self, area, cr):
+            w, h = area.get_allocated_width(), area.get_allocated_height()
+            lv, ch = self.steps[min(max(self.step, 1), len(self.steps)) - 1]
+            rgb = ch[1]
+            cr.set_antialias(cairo.ANTIALIAS_NONE)
+            cr.set_source_rgb(0, 0, 0)
+            cr.paint()
+            # 縞: 4 行を 1 周期にして、lv×4 行を明るくする (25%→1 行, 50%→2 行, 75%→3 行)
+            lit = round(lv * 4)
+            cr.set_source_rgb(*rgb)
+            for y in range(0, h, 4):
+                if lit == 2:
+                    cr.rectangle(0, y, w, 1)
+                    cr.rectangle(0, y + 2, w, 1)
+                else:
+                    cr.rectangle(0, y, w, lit)
+            cr.fill()
+            # 円 (ベタ)
+            v = self.value.get((lv, ch[0]), lv)
+            cr.set_antialias(cairo.ANTIALIAS_DEFAULT)
+            r = min(w, h) * 0.30
+            cr.arc(w / 2, h / 2, r, 0, 2 * math.pi)
+            cr.set_source_rgb(*(c * v for c in rgb))
+            cr.fill()
+            return False
+
+    win = Calibrator()
+    if screenshot:
+        # 見た目の確認用: 全ステップを描いて、1 枚の画像にする
+        def snap():
+            from PIL import Image
+            import io
+            frames = []
+            for s in (0, 2, 5, 10):
+                win.step = s
+                if s == 10:
+                    win.value = {(lv, ch[0]): lv ** (1 / 2.0) for lv in LEVELS for _, ch in [(0, c) for c in CHANNELS]}
+                win.show_step()
+                end = GLib.get_monotonic_time() + 400000
+                while GLib.get_monotonic_time() < end:
+                    Gtk.main_iteration_do(False)
+                pb = Gdk.pixbuf_get_from_window(win.get_window(), 0, 0, win.get_allocated_width(),
+                                                win.get_allocated_height())
+                ok, data = pb.save_to_bufferv("png", [], [])
+                frames.append(Image.open(io.BytesIO(data)))
+            wd = sum(f.width for f in frames)
+            sheet = Image.new("RGB", (wd, max(f.height for f in frames)))
+            x = 0
+            for f in frames:
+                sheet.paste(f, (x, 0))
+                x += f.width
+            sheet.save(screenshot)
+            Gtk.main_quit()
+            return False
+        GLib.timeout_add(600, snap)
+    Gtk.main()
+
+
+def main():
+    ap = argparse.ArgumentParser(description="SnowLinux ディスプレイ調整")
+    ap.add_argument("--apply", action="store_true", help="保存した調整を反映する")
+    ap.add_argument("--reset", action="store_true", help="調整を外す (履歴は残る)")
+    ap.add_argument("--screenshot", metavar="FILE", help=argparse.SUPPRESS)
+    a = ap.parse_args()
+    if a.apply:
+        sys.exit(apply_saved())
+    if a.reset:
+        reset_all()
+        return
+    run_gui(a.screenshot)
+
+
+if __name__ == "__main__":
+    main()
