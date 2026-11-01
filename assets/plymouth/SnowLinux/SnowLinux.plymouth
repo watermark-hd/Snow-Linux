@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=SnowLinux
+Description=Light gray background with the SnowLinux logo and a spinner
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/SnowLinux
+ScriptFile=/usr/share/plymouth/themes/SnowLinux/SnowLinux.script

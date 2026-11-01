@@ -48,10 +48,34 @@ def clean(folder):
                     os.remove(p)
 
 
+def read_overrides():
+    out = {}
+    path = os.path.join(ROOT, "config", "icon-overrides.txt")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    out[k] = v
+    return out
+
+
+ICON_OVERRIDES = read_overrides()
+
+
 def write(folder, app):
     src = app.get_filename()
     with open(src, encoding="utf-8", errors="replace") as f:
         body = f.read()
+    app_id = os.path.basename(src).removesuffix(".desktop")
+    if app_id in ICON_OVERRIDES:
+        lines = body.split("\n")
+        for i, line in enumerate(lines):
+            if line.startswith("Icon="):
+                lines[i] = "Icon=" + ICON_OVERRIDES[app_id]
+                break
+        body = "\n".join(lines)
     dst = os.path.join(folder, os.path.basename(src))
     with open(dst, "w", encoding="utf-8") as f:
         f.write(MARK + body)

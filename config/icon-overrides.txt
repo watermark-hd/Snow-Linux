@@ -1,0 +1,8 @@
+# 「アプリケーション」フォルダの起動ファイルの Icon= を、このテーマのアイコン名に書き換える。
+# 元の Icon= が絶対パスで、テーマを効かせられないものや、別のアプリと共通のものに使う。
+# 書式: .desktop のファイル名 (拡張子なし)=アイコン名
+luckybackup=luckybackup
+luckybackup-su=luckybackup
+Py-Loader=py-loader
+thunar-bulk-rename=thunar-bulk-rename
+mcedit=mcedit

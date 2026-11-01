@@ -271,6 +271,106 @@ def filemanager():
     return svg(body, defs)
 
 
+# ======================================================================
+# ユーティリティのアプリのアイコン: 銀色の角丸 + 機能ごとの図柄
+# ======================================================================
+
+def _gear(r_out=30, r_in=22, teeth=8, hole=9):
+    pts = []
+    for i in range(teeth * 2):
+        a0 = math.pi * 2 * i / (teeth * 2)
+        a1 = math.pi * 2 * (i + 1) / (teeth * 2)
+        r = r_out if i % 2 == 0 else r_in
+        pts.append((r * math.cos(a0 - 0.12), r * math.sin(a0 - 0.12)))
+        pts.append((r * math.cos(a1 - 0.30), r * math.sin(a1 - 0.30)))
+    d = "M" + "L".join(f"{x:.1f} {y:.1f}" for x, y in pts) + "Z"
+    return d + f"M{hole} 0a{hole} {hole} 0 1 0 -{hole * 2} 0a{hole} {hole} 0 1 0 {hole * 2} 0Z"
+
+
+# 図柄は、中心を (0,0)、おおよそ ±32 に収める。fill="currentColor" は、濃い青灰色で描かれる。
+GLYPHS = {
+    "gear": f'<path d="{_gear()}" fill-rule="evenodd"/>',
+    "terminal": '<rect x="-32" y="-24" width="64" height="48" rx="5"/><path d="M-22-10l12 9-12 9" fill="none" stroke="#e8e8e8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M-4 12h18" stroke="#e8e8e8" stroke-width="5" stroke-linecap="round"/>',
+    "monitor": '<path d="M-30 14a30 30 0 1 1 60 0z" fill="none" stroke="currentColor" stroke-width="7"/><path d="M0 12L16-14" stroke="#e0463c" stroke-width="6" stroke-linecap="round"/><circle r="6" cy="12"/>',
+    "disk": '<path d="M-32 8l8-24q2-5 7-5h34q5 0 7 5l8 24z" opacity="0.55"/><path d="M-32 8h64v12q0 5-5 5h-54q-5 0-5-5z"/><circle cx="22" cy="17" r="3.5" fill="#5aa4ff"/>',
+    "backup": '<path d="M-26 0a26 26 0 1 1 8 19" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/><path d="M-34-4l8 10 10-9z"/><path d="M0-12V1l9 6" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>',
+    "package": '<path d="M0-30L28-16V16L0 30L-28 16V-16z" opacity="0.5"/><path d="M0-30L28-16 0-2-28-16z"/><path d="M0-2V30" stroke="#e8e8e8" stroke-width="4"/><path d="M-12-23L16-9" stroke="#e8e8e8" stroke-width="4"/>',
+    "info": '<circle r="30"/><circle cy="-15" r="5" fill="#e8e8e8"/><rect x="-5" y="-6" width="10" height="26" rx="3" fill="#e8e8e8"/>',
+    "shield": '<path d="M0-32L28-22V4q0 18-28 30Q-28 22-28 4V-22z"/><path d="M-12 2l9 9 16-18" fill="none" stroke="#e8e8e8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>',
+    "key": '<circle cx="-14" cy="-6" r="16"/><circle cx="-18" cy="-10" r="5" fill="#e8e8e8"/><path d="M-4 4L28 30M14 18l-8 8M22 26l-8 8" stroke="currentColor" stroke-width="7" stroke-linecap="round" fill="none"/>',
+    "camera": '<path d="M-32-12h16l5-9h22l5 9h16q5 0 5 5V20q0 5-5 5h-64q-5 0-5-5V-7q0-5 5-5z"/><circle cy="6" r="14" fill="#e8e8e8"/><circle cy="6" r="8"/>',
+    "search": '<circle cx="-5" cy="-5" r="22" fill="none" stroke="currentColor" stroke-width="8"/><path d="M12 12L32 32" stroke="currentColor" stroke-width="10" stroke-linecap="round"/>',
+    "archive": '<rect x="-30" y="-28" width="60" height="22" rx="4"/><path d="M-26-6h52V24q0 5-5 5h-42q-5 0-5-5z" opacity="0.7"/><rect x="-9" y="2" width="18" height="8" rx="3" fill="#e8e8e8"/>',
+    "disc": '<circle r="30" opacity="0.6"/><circle r="30" fill="none" stroke="currentColor" stroke-width="4"/><circle r="10" fill="#e8e8e8"/><circle r="4"/>',
+    "usb": '<rect x="-12" y="-32" width="24" height="18" rx="2"/><path d="M-18-10h36v34q0 6-6 6h-24q-6 0-6-6z"/><rect x="-6" y="6" width="12" height="14" rx="3" fill="#e8e8e8"/>',
+    "tag": '<path d="M-30-6L-4-32H26q6 0 6 6V4L6 30q-4 4-9 0L-30 3q-4-4 0-9z"/><circle cx="14" cy="-14" r="5" fill="#e8e8e8"/>',
+    "chip": '<rect x="-22" y="-22" width="44" height="44" rx="5"/><rect x="-11" y="-11" width="22" height="22" rx="3" fill="#e8e8e8"/><path d="M-12-30v8M0-30v8M12-30v8M-12 22v8M0 22v8M12 22v8M-30-12h8M-30 0h8M-30 12h8M22-12h8M22 0h8M22 12h8" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>',
+    "wrench": '<path d="M-30 0a30 30 0 0 1 40-28l-17 17 9 9 17-17a30 30 0 0 1-28 40L-24 24l-12-12z"/>',
+}
+
+# アプリの図柄の割り当て (.desktop のファイル名 → 図柄)
+APP_GLYPH = {
+    "terminal": ["xfce4-terminal", "mc", "mcedit", "bashrc-config", "alsamixer"],
+    "monitor": ["htop", "xfce4-taskmanager", "xfce4-sensors", "hardinfo2", "Quick_System_Info", "mx-viewer"],
+    "disk": ["gparted", "disk-manager", "QDiskInfo", "org.gnome.baobab", "formatusb", "uefi-manager"],
+    "chip": ["ddm-nvidia"],
+    "backup": ["timeshift-gtk", "luckybackup", "luckybackup-su", "mx-snapshot"],
+    "package": ["synaptic", "mx-packageinstaller", "deb-installer", "mx-repo-manager", "user-installed-packages", "mx-checkaptgpg"],
+    "gear": ["ca.desrt.dconf-editor", "xfce4-settings-editor", "mx-tools", "mx-boot-repair", "mx-boot-options", "mx-live-usb-maker",
+             "live-kernel-updater", "mx-cleanup", "mx-service-manager", "mx-remastercc", "chroot-rescue-scan", "verify-iso-sig",
+             "mx-samba-config", "menulibre", "Jar-Loader", "Py-Loader", "job-scheduler"],
+    "shield": ["gufw"],
+    "key": ["org.gnome.seahorse.Application"],
+    "camera": ["xfce4-screenshooter", "guvcview"],
+    "search": ["org.xfce.Catfish"],
+    "archive": ["engrampa"],
+    "disc": ["xfburn"],
+    "usb": ["gmtp"],
+    "tag": ["thunar-bulk-rename", "org.gtkhash.gtkhash"],
+}
+
+
+def app_icon(glyph):
+    defs = (lin("b", [(0, "#fbfbfb"), (0.55, "#d9d9d9"), (1, "#a9a9a9")]) +
+            lin("g", [(0, "#ffffff"), (1, "#ffffff")]))
+    body = (
+        '<ellipse cx="64" cy="118" rx="42" ry="5" fill="#000" fill-opacity="0.18"/>'
+        '<rect x="10" y="8" width="108" height="108" rx="24" fill="url(#b)" stroke="#6f6f6f" stroke-width="2"/>'
+        '<path d="M14 40q0-28 26-28h48q26 0 26 28v0q-50 20-100 0z" fill="#fff" fill-opacity="0.45"/>'
+        f'<g transform="translate(64 62) scale(1.05)" color="#3a4a62" fill="#3a4a62">'
+        f'<g transform="translate(0 1.5)" fill="#fff" color="#fff" opacity="0.8">{GLYPHS[glyph]}</g>{GLYPHS[glyph]}</g>'
+    )
+    return svg(body, defs)
+
+
+def read_icon_names():
+    """utilities.txt の各アプリの Icon= (テーマの名前だけ) を調べる。上書きの指定も反映する。"""
+    overrides = {}
+    p = os.path.join(ASSETS, "..", "config", "icon-overrides.txt")
+    if os.path.exists(p):
+        for line in open(p, encoding="utf-8"):
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                overrides[k] = v
+    names = {}
+    for glyph, ids in APP_GLYPH.items():
+        for i in ids:
+            if i in overrides:
+                names[overrides[i]] = glyph
+                continue
+            f = f"/usr/share/applications/{i}.desktop"
+            if not os.path.exists(f):
+                continue
+            for line in open(f, encoding="utf-8", errors="replace"):
+                if line.startswith("Icon="):
+                    n = line.strip().split("=", 1)[1].strip()
+                    if n and not n.startswith("/"):
+                        names[n] = glyph
+                    break
+    return names
+
+
 def generate_icons(root):
     files = {}
     # 場所
@@ -292,6 +392,8 @@ def generate_icons(root):
     fm = filemanager()
     for name in ("org.xfce.filemanager", "system-file-manager", "org.xfce.thunar", "thunar"):
         files[f"scalable/apps/{name}.svg"] = fm
+    for icon_name, glyph in read_icon_names().items():
+        files[f"scalable/apps/{icon_name}.svg"] = app_icon(glyph)
     for rel, content in files.items():
         p = os.path.join(root, rel)
         os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -335,12 +437,115 @@ Context=Applications
     return len(files)
 
 
+# ======================================================================
+# 起動画面 (Plymouth): グレーの背景に、ロゴと回るスピナー
+# ======================================================================
+
+def draw_snowflake(ctx, cx, cy, r, width, rgba):
+    ctx.set_line_width(width)
+    ctx.set_line_cap(cairo.LINE_CAP_ROUND)
+    ctx.set_source_rgba(*rgba)
+    for k in range(6):
+        a = math.radians(90 + 60 * k)
+        ux, uy = math.cos(a), math.sin(a)
+        ctx.move_to(cx, cy)
+        ctx.line_to(cx + ux * r, cy - uy * r)
+        for frac, blen in ((0.52, 0.36), (0.78, 0.22)):
+            bx, by = cx + ux * r * frac, cy - uy * r * frac
+            for sgn in (-1, 1):
+                b = a + sgn * math.radians(60)
+                ctx.move_to(bx, by)
+                ctx.line_to(bx + math.cos(b) * r * blen, by - math.sin(b) * r * blen)
+        ctx.stroke()
+
+
+def plymouth_assets(root):
+    os.makedirs(root, exist_ok=True)
+    size = 192
+    surf, ctx = new_canvas_px(size, size)
+    # 影 (白い縁取り) → 本体の順に描くと、グレーの背景で浮き上がって見える
+    draw_snowflake(ctx, size / 2, size / 2 + 1.5, size * 0.44, 9, (1, 1, 1, 0.75))
+    draw_snowflake(ctx, size / 2, size / 2, size * 0.44, 8, (0.30, 0.34, 0.40, 1))
+    surf.write_to_png(os.path.join(root, "logo.png"))
+    # スピナー (12 コマ)
+    n = 12
+    for f in range(n):
+        s2, c2 = new_canvas_px(40, 40)
+        for i in range(n):
+            a = 2 * math.pi * i / n - math.pi / 2
+            age = (f - i) % n
+            alpha = max(0.12, 1 - age / (n * 0.75))
+            c2.arc(20 + 14 * math.cos(a), 20 + 14 * math.sin(a), 2.8, 0, 6.3)
+            c2.set_source_rgba(0.30, 0.34, 0.40, alpha)
+            c2.fill()
+        s2.write_to_png(os.path.join(root, f"spinner-{f}.png"))
+    with open(os.path.join(root, "SnowLinux.plymouth"), "w") as fh:
+        fh.write("""[Plymouth Theme]
+Name=SnowLinux
+Description=Light gray background with the SnowLinux logo and a spinner
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/SnowLinux
+ScriptFile=/usr/share/plymouth/themes/SnowLinux/SnowLinux.script
+""")
+    with open(os.path.join(root, "SnowLinux.script"), "w") as fh:
+        fh.write("""# SnowLinux の起動画面: 明るいグレーのグラデーション、ロゴ、回るスピナー
+Window.SetBackgroundTopColor(0.93, 0.93, 0.93);
+Window.SetBackgroundBottomColor(0.74, 0.74, 0.76);
+
+logo.image = Image("logo.png");
+logo.sprite = Sprite(logo.image);
+logo.x = Window.GetX() + Window.GetWidth() / 2 - logo.image.GetWidth() / 2;
+logo.y = Window.GetY() + Window.GetHeight() / 2 - logo.image.GetHeight() / 2 - 40;
+logo.sprite.SetPosition(logo.x, logo.y, 10);
+
+for (i = 0; i < 12; i++)
+    spinner.image[i] = Image("spinner-" + i + ".png");
+spinner.sprite = Sprite();
+spinner.x = Window.GetX() + Window.GetWidth() / 2 - spinner.image[0].GetWidth() / 2;
+spinner.y = logo.y + logo.image.GetHeight() + 36;
+spinner.sprite.SetPosition(spinner.x, spinner.y, 10);
+spinner.count = 0;
+
+fun refresh_callback() {
+    spinner.sprite.SetImage(spinner.image[Math.Int(spinner.count / 3) % 12]);
+    spinner.count++;
+}
+Plymouth.SetRefreshFunction(refresh_callback);
+
+# 暗号化ディスクのパスワード入力 (簡単な表示)
+prompt.sprite = Sprite();
+bullets.sprite = Sprite();
+fun display_password_callback(prompt_text, bullet_count) {
+    prompt.sprite.SetImage(Image.Text(prompt_text, 0.2, 0.22, 0.26));
+    prompt.sprite.SetPosition(Window.GetX() + Window.GetWidth() / 2 - prompt.sprite.GetImage().GetWidth() / 2, spinner.y + 60, 20);
+    bullet_text = "";
+    for (i = 0; i < bullet_count; i++) bullet_text += "*";
+    bullets.sprite.SetImage(Image.Text(bullet_text, 0.2, 0.22, 0.26));
+    bullets.sprite.SetPosition(Window.GetX() + Window.GetWidth() / 2 - bullets.sprite.GetImage().GetWidth() / 2, spinner.y + 90, 20);
+}
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+fun display_normal_callback() {
+    prompt.sprite.SetOpacity(0);
+    bullets.sprite.SetOpacity(0);
+}
+Plymouth.SetDisplayNormalFunction(display_normal_callback);
+""")
+
+
+def new_canvas_px(w, h):
+    surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
+    return surf, cairo.Context(surf)
+
+
 def main():
     with open(out("logo", "snowlinux-logo.svg"), "w") as f:
         f.write(logo_mono())
     with open(out("logo", "snowlinux-logo-color.svg"), "w") as f:
         f.write(logo_color())
     wallpaper().save(out("wallpapers", "SnowLinux-Dusk.jpg"), quality=92, optimize=True)
+    plymouth_assets(os.path.dirname(out("plymouth", "SnowLinux", "x")))
     n = generate_icons(out("icons", "SnowLinux", "x")[:-1].rstrip("/"))
     print("ロゴ 2、壁紙 1、アイコン", n)
 

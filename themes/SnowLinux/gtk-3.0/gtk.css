@@ -136,3 +136,13 @@ progressbar progress { min-height: 12px; border-radius: 8px; border: 1px solid #
 notebook > header { background-color: #e2e2e2; border-color: #a0a0a0; }
 notebook > header > tabs > tab { padding: 3px 12px; border: 1px solid #a0a0a0; border-radius: 5px 5px 0 0; background-image: linear-gradient(to bottom, #f1f1f1, #d4d4d4); color: #333; }
 notebook > header > tabs > tab:checked { background-image: linear-gradient(to bottom, #ffffff, #ececec); color: #000; }
+
+/* ---------- Thunar のサイドバー (Finder のソースリスト風) ---------- */
+.thunar .sidebar.frame { border-style: none; border-right: 1px solid #a3acb7; background-color: #dde3ea; }
+.thunar .sidebar treeview.view, .thunar .sidebar .view { background-color: #dde3ea; background-image: none; color: #2b3138; }
+.thunar .sidebar treeview.view:selected, .thunar .sidebar treeview.view:selected:focus {
+  color: #ffffff; text-shadow: 0 -1px 0 rgba(0,0,0,0.35);
+  background-image: linear-gradient(to bottom, @snow_blue_top, @snow_blue_mid 55%, @snow_blue_bottom);
+}
+.thunar .sidebar treeview.view:selected:backdrop { color: #ffffff; text-shadow: none; background-image: linear-gradient(to bottom, #b4b4b4, #8f8f8f); }
+.thunar .sidebar treeview.view:hover { background-color: rgba(0,0,0,0.05); }
