@@ -182,5 +182,20 @@ SnowLinux 用スレッドでの相談・決定・作業の記録。新しいも�
   - 決定: digiKam は外す (軽いもので代用)。Strawberry (音楽) は残す。Thunderbird は標準で入れる。
   - 「消す」36 個を `config/hidden-apps.txt` に一覧し、`scripts/gen-hidden-apps.sh` で `config/skel/.local/share/applications/` に隠すためのファイルを作る。Gio で確認: メニューに出るアプリが 159 → 123 に減る。
   - 「システム環境設定に統合」は、システム環境設定アプリを作るまで隠さない (隠すと Xfce の設定マネージャーからも消える可能性)。
-  - 気づき: VS Code は Flatpak 版 (`com.microsoft.VSCode`) のようだ。ISO への同梱の問題は、Flatpak で初回に入れる方法で解決できる可能性がある (要確認)。
+  - 気づき (訂正あり): VS Code の起動ファイルの名前が `com.microsoft.VSCode` なので Flatpak 版かと推測したが、実際は Microsoft の deb 版 (`/usr/share/code/code`) だった。ISO への同梱の可否は、引き続き要確認。
   - まだできていないこと: アプリケーションフォルダとユーティリティフォルダ (仮想のフォルダ) の実装。PhotoCraft / LightCraft の追加 (ライセンス確認が先)。
+- ライセンスを決めた: **MIT** (他のリポジトリと同じ)。`LICENSE` を追加。GPL のソフトウェアから派生したコード (Plank の改造など) は、専用のフォルダに元のライセンスのまま置く。
+- README を、英語と日本語の 2 本立てで作り直した (現状は開発の初期、目標、Apple とは無関係であること、フォルダの構成、試し方、ライセンス)。
+- 3. 写真アプリを GitHub で調べた (本家は `storytold/photocraft` と `storytold/lightcraft`):
+  - ライセンスはどちらも **Apache-2.0**。NOTICE を付ければ ISO に同梱できる。Rust 製。開発は活発 (数日おきにリリース)。PhotoCraft は Photoshop 風、LightCraft は Lightroom 風。
+  - x86_64 の deb、AppImage、Flatpak がある。**PowerPC 用のビルドはない**。PPC 版には別の方法が必要。
+  - x86_64 の deb をダウンロードして、インストールせずに中身を確認した: チェックサム OK、メンテナスクリプトは無害 (キャッシュの更新のみ)、依存は libc6 などの基本のもの、GTK ではなく独自の描画 (Vulkan / EGL)。実行ファイルは約 130MB。
+  - まだ確認していないこと: この機械 (Celeron N3060) での起動の速さ、メモリ使用量、GPU の描画。インストールして測る必要がある。
+- 1. 「アプリケーション」フォルダと「ユーティリティ」フォルダを作る仕組みを作った。
+  - 実際のフォルダ `/Applications` と `/Applications/Utilities` に、アプリの起動ファイルを並べる。Thunar で開くとアイコンが並び、ダブルクリックで起動できる。
+  - 分類は `config/utilities.txt` (ユーティリティ) と `config/prefs-apps.txt` (システム環境設定に統合・入れない) で決まる。どれにも当てはまらないアプリは直下に入る。隠したアプリも入らない。`scripts/gen-applications-folder.py` が作る。
+  - 試しに作った結果: アプリケーション 20 個、ユーティリティ 54 個。
+  - Thunar のサイドバーに「アプリケーション」のブックマークを追加 (`config/skel/.config/gtk-3.0/bookmarks`)。
+  - `apply-to-snowtest.sh` が `/Applications` も作る (システム全体に共通のフォルダ)。
+  - これから: ① アプリのインストール・削除のたびに作り直す仕組み (dpkg のフック)。② フォルダ名の日本語表示 (Thunar の改造が必要)。③ ユーティリティフォルダの専用アイコン。④ Dock のスタック表示。
+- 確認 (snowtest): 「アプリケーション」フォルダは問題なく表示された。課題: フォルダの中のアイコンが、まだ文字と同じように味気ない。順を追って改善する (アイコンテーマ)。デスクトップには Debian のマークが残っていて、まだ Linux の雰囲気。壁紙とロゴを SnowLinux 用に作り直す。

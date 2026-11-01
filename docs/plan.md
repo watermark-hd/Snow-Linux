@@ -76,7 +76,10 @@
 ## 写真アプリの確認事項
 
 - PhotoCraft / LightCraft は deb で配布されている (ユーザー確認)
-- ライセンスは GitHub で確認する (ISO に同梱して配布できるか)
+- ライセンスは GitHub で確認した (2026-11-01): **PhotoCraft も LightCraft も Apache-2.0**。ライセンス表示 (NOTICE) を付ければ ISO に同梱できる
+- 本家は `storytold/photocraft`、`storytold/lightcraft` (Rust 製、開発は活発で、数日おきにリリース)。PhotoCraft は Photoshop 風の画像編集、LightCraft は Lightroom 風の現像と管理
+- 配布形式: x86_64 の deb、AppImage、Flatpak など。**PowerPC 用のビルドはない** → PPC 版には別の方法が必要 (ソースからのビルド、または別のアプリ)
+- 気をつける点: ① 実行ファイルが約 130MB と大きい (起動の速さを測る)。② GTK ではなく独自の描画 (Vulkan / EGL を使う) → 古い GPU でどう動くか、見た目の統一 ③ まだ初期段階
 
 ## 差別化 (PearOS との比較)
 

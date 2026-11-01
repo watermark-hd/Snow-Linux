@@ -1,0 +1,72 @@
+# 「アプリケーション」フォルダの中の「ユーティリティ」フォルダに入れるアプリ (docs/apps.md)。
+# 1 行に 1 つ、.desktop のファイル名 (拡張子なし)。
+# ここにも config/prefs-apps.txt にもないアプリは、「アプリケーション」フォルダの直下に入る。
+
+# システム
+xfce4-terminal
+htop
+xfce4-taskmanager
+xfce4-sensors
+ca.desrt.dconf-editor
+xfce4-settings-editor
+alsamixer
+
+# ディスク
+gparted
+disk-manager
+QDiskInfo
+org.gnome.baobab
+formatusb
+uefi-manager
+ddm-nvidia
+
+# 情報
+hardinfo2
+Quick_System_Info
+
+# バックアップ
+timeshift-gtk
+luckybackup
+luckybackup-su
+mx-snapshot
+
+# パッケージ
+synaptic
+mx-packageinstaller
+deb-installer
+mx-repo-manager
+user-installed-packages
+mx-checkaptgpg
+
+# MX ツール
+mx-tools
+mx-boot-repair
+mx-boot-options
+mx-live-usb-maker
+live-kernel-updater
+mx-cleanup
+mx-service-manager
+mx-remastercc
+chroot-rescue-scan
+verify-iso-sig
+mx-samba-config
+gufw
+mx-viewer
+
+# その他
+xfce4-screenshooter
+org.xfce.Catfish
+org.gnome.seahorse.Application
+engrampa
+xfburn
+thunar-bulk-rename
+gmtp
+org.gtkhash.gtkhash
+guvcview
+menulibre
+mc
+mcedit
+Jar-Loader
+Py-Loader
+bashrc-config
+job-scheduler

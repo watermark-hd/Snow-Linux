@@ -43,4 +43,7 @@ for f in "$root"/config/dconf/*.dconf; do
     [ -f "$f" ] && sudo -u "$user" -H dbus-run-session -- dconf load / < "$f"
 done
 
+# 「アプリケーション」フォルダ (システム全体で共通。実際のインストールでは、パッケージの更新のたびに作り直す)
+python3 "$root/scripts/gen-applications-folder.py" /Applications
+
 echo "$skel、$themes、dconf の設定を /home/$user に反映しました。"

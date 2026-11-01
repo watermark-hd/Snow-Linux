@@ -1,0 +1,55 @@
+# 「システム環境設定」に統合するアプリ (docs/apps.md)。「アプリケーション」フォルダには入れない。
+# 1 行に 1 つ、.desktop のファイル名 (拡張子なし)。
+# システム環境設定アプリ (自作) ができるまでは、Xfce の設定マネージャーから開く。
+
+xfce-display-settings
+xfce-keyboard-settings
+xfce-mouse-settings
+xfce-ui-settings
+xfce-wm-settings
+xfce-wmtweaks-settings
+xfce-workspaces-settings
+xfce-backdrop-settings
+panel-preferences
+xfce4-notifyd-config
+xfce4-power-manager-settings
+xfce4-screensaver-preferences
+xfce4-accessibility-settings
+xfce-session-settings
+xfce4-mime-settings
+xfce4-color-settings
+fcitx-configtool
+im-config
+setup-mozc
+system-keyboard-qt
+mx-datetime
+mx-locale
+mx-select-sound
+mx-system-sounds
+mx-theme-colors
+org.pulseaudio.pavucontrol
+blueman-adapters
+blueman-manager
+nm-connection-editor
+mx-network-assistant
+system-config-printer
+thunar-settings
+thunar-volman-settings
+org.xfce.orage-settings
+lightdm-gtk-greeter-settings
+papirus-folder-colors
+mx-tweak
+mx-tweak-systray
+mx-updater-settings
+mx-updater
+redshift-gtk
+xfce4-terminal-settings
+xfce4-clipman-settings
+xfce4-clipman
+mx-user
+org.bluesabre.Mugshot
+mx-usb-unmounter
+
+# 内部用 (フォルダには入れない)
+plank
+xfce4-session-logout
