@@ -1,0 +1,138 @@
+/* SnowLinux の GTK3 テーマ。
+ * 土台は Greybird (Xfce 標準)。その上に、Mac OS X 10.4〜10.6 の雰囲気になる上書きを重ねる。
+ * 画像は使わず、グラデーションだけで描く (軽くするため)。
+ */
+@import url("file:///usr/share/themes/Greybird/gtk-3.0/gtk.css");
+
+@define-color snow_blue_top #6fa8f2;
+@define-color snow_blue_mid #3d7be0;
+@define-color snow_blue_bottom #2a63c4;
+@define-color snow_select #3875d7;
+
+/* ---------- ウィンドウ ---------- */
+window.background, dialog.background { background-color: #ececec; color: #1e1e1e; }
+.view, textview text, iconview, treeview.view { background-color: #ffffff; color: #1e1e1e; }
+
+/* ---------- ボタン ---------- */
+button {
+  min-height: 20px;
+  padding: 2px 12px;
+  color: #1e1e1e;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.8);
+  background-image: linear-gradient(to bottom, #ffffff 0%, #f2f2f2 50%, #dedede 51%, #e9e9e9 100%);
+  border: 1px solid #8c8c8c;
+  border-bottom-color: #747474;
+  border-radius: 5px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 1px 0 rgba(255,255,255,0.5);
+}
+button:hover { background-image: linear-gradient(to bottom, #ffffff 0%, #f8f8f8 50%, #e6e6e6 51%, #f0f0f0 100%); }
+button:active, button:checked {
+  background-image: linear-gradient(to bottom, #bdbdbd 0%, #cfcfcf 50%, #d8d8d8 100%);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.35);
+}
+button:disabled { color: #9a9a9a; text-shadow: none; background-image: linear-gradient(to bottom, #f6f6f6, #ececec); border-color: #c4c4c4; box-shadow: none; }
+button.suggested-action, button.default {
+  color: #ffffff;
+  text-shadow: 0 -1px 0 rgba(0,0,0,0.4);
+  background-image: linear-gradient(to bottom, #b4d2fb 0%, #6fa8f2 50%, #3d7be0 51%, #5b95ea 100%);
+  border-color: #2a5ab0;
+  border-bottom-color: #1f4a96;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), 0 0 0 1px rgba(91,150,240,0.25);
+}
+button.suggested-action:active, button.default:active { background-image: linear-gradient(to bottom, #2a63c4, #4a86e4); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4); }
+button.destructive-action { color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,0.4); background-image: linear-gradient(to bottom, #f7b3ad 0%, #ec6d63 50%, #d93f33 51%, #e5584c 100%); border-color: #a82a20; }
+
+/* ---------- 入力 ---------- */
+entry, spinbutton {
+  color: #1e1e1e; background-color: #ffffff; background-image: none;
+  border: 1px solid #8f8f8f; border-top-color: #6e6e6e; border-radius: 3px;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.22);
+}
+entry:focus, spinbutton:focus { border-color: #4f93ee; box-shadow: inset 0 1px 2px rgba(0,0,0,0.15), 0 0 0 3px rgba(79,147,238,0.55); }
+entry selection, textview text selection, label selection { background-color: #b3d4fc; color: #000000; }
+
+/* ---------- ヘッダーバー・タイトルバー (xfwm4 のタイトルバーと同じ見た目) ---------- */
+headerbar, .titlebar {
+  background-image: linear-gradient(to bottom, #f8f8f8 0%, #e3e3e3 6%, #b6b6b6 100%);
+  border: none; border-bottom: 1px solid #686868; border-radius: 6px 6px 0 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+  color: #3a3a3a; text-shadow: 0 1px 0 rgba(255,255,255,0.7);
+}
+headerbar:backdrop, .titlebar:backdrop { background-image: linear-gradient(to bottom, #fcfcfc, #eeeeee 6%, #d4d4d4 100%); border-bottom-color: #9d9d9d; color: #999999; }
+headerbar .title { font-weight: normal; color: #3a3a3a; }
+
+/* ---------- ツールバー (一体型ツールバーのように、タイトルバーから続くグレー) ---------- */
+toolbar, .toolbar {
+  background-image: linear-gradient(to bottom, #c4c4c4 0%, #acacac 100%);
+  border: none; border-bottom: 1px solid #5f5f5f;
+  padding: 3px 4px; color: #1e1e1e; text-shadow: 0 1px 0 rgba(255,255,255,0.45);
+}
+toolbar button, .toolbar button, toolbar .button { background-image: none; background-color: transparent; border-color: transparent; box-shadow: none; }
+toolbar button:hover, .toolbar button:hover { background-image: linear-gradient(to bottom, #e6e6e6, #cfcfcf); border-color: #7d7d7d; box-shadow: inset 0 1px 0 rgba(255,255,255,0.7); }
+toolbar button:active, toolbar button:checked { background-image: linear-gradient(to bottom, #8d8d8d, #a6a6a6); border-color: #5d5d5d; box-shadow: inset 0 1px 3px rgba(0,0,0,0.45); }
+
+/* ---------- サイドバー (ソースリスト) ---------- */
+.sidebar, placessidebar, placessidebar list, .sidebar list { background-color: #dde3ea; background-image: none; color: #2b3138; border-right: 1px solid #a3acb7; }
+.sidebar row, placessidebar row { padding: 3px 8px; }
+.sidebar row:selected, placessidebar row:selected {
+  color: #ffffff; text-shadow: 0 -1px 0 rgba(0,0,0,0.35);
+  background-image: linear-gradient(to bottom, @snow_blue_top, @snow_blue_mid 55%, @snow_blue_bottom);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+}
+.sidebar row:selected:backdrop, placessidebar row:selected:backdrop { background-image: linear-gradient(to bottom, #b4b4b4, #8f8f8f); }
+
+/* ---------- 選択 ---------- */
+.view:selected, iconview:selected, treeview.view:selected, row:selected, .view:selected:focus {
+  background-color: @snow_select; background-image: none; color: #ffffff;
+}
+.view:selected:backdrop, iconview:selected:backdrop, treeview.view:selected:backdrop { background-color: #c5c5c5; color: #1e1e1e; }
+
+/* ---------- メニュー ---------- */
+menubar { background-image: linear-gradient(to bottom, #f6f6f6, #d4d4d4); border-bottom: 1px solid #8a8a8a; color: #000; text-shadow: none; }
+menubar > menuitem { padding: 2px 8px; }
+menubar > menuitem:hover { background-image: linear-gradient(to bottom, @snow_blue_top, @snow_blue_bottom); color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,0.35); }
+menu, .menu, .popup {
+  background-color: #f2f2f2; color: #000;
+  border: 1px solid rgba(0,0,0,0.4); border-radius: 0 0 5px 5px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35); padding: 3px 0;
+}
+menuitem { padding: 3px 14px; }
+menuitem:hover, menu menuitem:hover { background-image: linear-gradient(to bottom, @snow_blue_top, @snow_blue_bottom); color: #ffffff; text-shadow: 0 -1px 0 rgba(0,0,0,0.35); }
+menuitem:disabled { color: #9a9a9a; }
+separator { background-color: #cfcfcf; }
+menu separator { margin: 3px 0; }
+
+/* ---------- メニューバー (Xfce パネル) ----------
+ * 文字の影 (text-shadow) と外側の影 (box-shadow) は使わない。
+ * パネルは透明を扱える窓なので、半透明の影がタイル状に見えることがあるため。 */
+.xfce4-panel.background {
+  background-color: #dcdcdc;
+  background-image: linear-gradient(to bottom, #fafafa 0%, #e6e6e6 50%, #d0d0d0 100%);
+  border-bottom: 1px solid #7a7a7a; color: #000;
+}
+.xfce4-panel button { background-image: none; background-color: transparent; border: none; box-shadow: none; text-shadow: none; padding: 0 7px; min-height: 0; border-radius: 0; color: #000; }
+.xfce4-panel button:hover, .xfce4-panel button:checked { background-image: linear-gradient(to bottom, @snow_blue_top, @snow_blue_bottom); color: #fff; }
+.xfce4-panel menubar, .xfce4-panel menubar > menuitem { background-image: none; background-color: transparent; border: none; box-shadow: none; text-shadow: none; }
+.xfce4-panel menubar > menuitem:hover { background-image: linear-gradient(to bottom, @snow_blue_top, @snow_blue_bottom); color: #fff; }
+.xfce4-panel label { color: #000; text-shadow: none; }
+.xfce4-panel button:hover label, .xfce4-panel button:checked label, .xfce4-panel menubar > menuitem:hover label { color: #fff; }
+
+/* ---------- スクロールバー ---------- */
+scrollbar { background-color: #f4f4f4; background-image: none; border: none; }
+scrollbar.vertical { border-left: 1px solid #d2d2d2; }
+scrollbar.horizontal { border-top: 1px solid #d2d2d2; }
+scrollbar slider { min-width: 12px; min-height: 12px; border-radius: 8px; border: 1px solid #3f68ad; background-color: #5b93e6; }
+scrollbar.vertical slider { background-image: linear-gradient(to right, #a8c8f6 0%, #6ea4ee 45%, #3f7be0 55%, #5d97ea 100%); }
+scrollbar.horizontal slider { background-image: linear-gradient(to bottom, #a8c8f6 0%, #6ea4ee 45%, #3f7be0 55%, #5d97ea 100%); }
+scrollbar slider:hover { border-color: #2f56a0; }
+scrollbar slider:active { background-image: linear-gradient(to bottom, #4e86d8, #7aaaf0); }
+scrollbar button { min-width: 0; min-height: 0; padding: 0; }
+
+/* ---------- 進行状況 ---------- */
+progressbar trough { min-height: 12px; border-radius: 8px; border: 1px solid #8a8a8a; background-image: linear-gradient(to bottom, #cdcdcd, #eeeeee); box-shadow: inset 0 1px 2px rgba(0,0,0,0.25); }
+progressbar progress { min-height: 12px; border-radius: 8px; border: 1px solid #2a5ab0; background-image: linear-gradient(to bottom, #b9d6fb 0%, #6fa8f2 50%, #3d7be0 51%, #5b97ec 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.6); }
+
+/* ---------- タブ ---------- */
+notebook > header { background-color: #e2e2e2; border-color: #a0a0a0; }
+notebook > header > tabs > tab { padding: 3px 12px; border: 1px solid #a0a0a0; border-radius: 5px 5px 0 0; background-image: linear-gradient(to bottom, #f1f1f1, #d4d4d4); color: #333; }
+notebook > header > tabs > tab:checked { background-image: linear-gradient(to bottom, #ffffff, #ececec); color: #000; }

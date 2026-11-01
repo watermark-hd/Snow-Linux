@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=SnowLinux
+Comment=A light, classic theme in the spirit of Mac OS X 10.4-10.6
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=SnowLinux
+MetacityTheme=SnowLinux
+IconTheme=SnowLinux

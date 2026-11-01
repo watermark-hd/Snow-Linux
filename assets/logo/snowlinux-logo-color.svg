@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8dc0ff"/><stop offset="0.55" stop-color="#3f84e6"/><stop offset="1" stop-color="#1c55b8"/></linearGradient>
+<linearGradient id="gl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.85"/><stop offset="1" stop-color="#fff" stop-opacity="0.05"/></linearGradient>
+</defs>
+<circle cx="64" cy="64" r="60" fill="url(#bg)" stroke="#173f86" stroke-width="2"/>
+<ellipse cx="64" cy="38" rx="46" ry="30" fill="url(#gl)"/>
+<path d="M64.00 64.00L64.00 20.00M64.00 41.12L77.72 33.20M64.00 41.12L50.28 33.20M64.00 29.68L72.38 24.84M64.00 29.68L55.62 24.84M64.00 64.00L25.89 42.00M44.19 52.56L44.19 36.72M44.19 52.56L30.47 60.48M34.28 46.84L34.28 37.16M34.28 46.84L25.89 51.68M64.00 64.00L25.89 86.00M44.19 75.44L30.47 67.52M44.19 75.44L44.19 91.28M34.28 81.16L25.89 76.32M34.28 81.16L34.28 90.84M64.00 64.00L64.00 108.00M64.00 86.88L50.28 94.80M64.00 86.88L77.72 94.80M64.00 98.32L55.62 103.16M64.00 98.32L72.38 103.16M64.00 64.00L102.11 86.00M83.81 75.44L83.81 91.28M83.81 75.44L97.53 67.52M93.72 81.16L93.72 90.84M93.72 81.16L102.11 76.32M64.00 64.00L102.11 42.00M83.81 52.56L97.53 60.48M83.81 52.56L83.81 36.72M93.72 46.84L102.11 51.68M93.72 46.84L93.72 37.16" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

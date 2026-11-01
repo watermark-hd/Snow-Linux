@@ -36,6 +36,16 @@ for t in "$themes"/*/; do
     [ -d "$t" ] && cp -a --no-preserve=ownership "$t" "/home/$user/.themes/"
 done
 
+# アイコンテーマとロゴ (実際のインストールでは /usr/share/icons に入れる)
+mkdir -p "/home/$user/.local/share/icons/hicolor/scalable/apps"
+cp -a --no-preserve=ownership "$root/assets/icons/SnowLinux" "/home/$user/.local/share/icons/"
+cp --no-preserve=ownership "$root/assets/logo/snowlinux-logo.svg" "/home/$user/.local/share/icons/hicolor/scalable/apps/"
+cp --no-preserve=ownership "$root/assets/logo/snowlinux-logo-color.svg" "/home/$user/.local/share/icons/hicolor/scalable/apps/"
+
+# 壁紙 (システム全体で共通。ユーザーごとの設定から /usr/share/backgrounds/SnowLinux/ を参照する)
+mkdir -p /usr/share/backgrounds/SnowLinux
+cp "$root"/assets/wallpapers/*.jpg /usr/share/backgrounds/SnowLinux/
+
 chown -R "$user:$user" "/home/$user"
 
 # dconf の設定 (Plank など)。snowtest として、一時的な D-Bus セッションで書き込む

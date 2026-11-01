@@ -30,7 +30,7 @@
     <!-- 左端のメニュー (自作プラグインができるまでの仮) -->
     <property name="plugin-1" type="string" value="applicationsmenu">
       <property name="show-button-title" type="bool" value="false"/>
-      <property name="button-icon" type="string" value="start-here"/>
+      <property name="button-icon" type="string" value="snowlinux-logo"/>
     </property>
     <!-- アプリ名とメニュー (グローバルメニュー) -->
     <property name="plugin-2" type="string" value="appmenu">

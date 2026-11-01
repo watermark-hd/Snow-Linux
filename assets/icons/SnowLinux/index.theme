@@ -1,0 +1,33 @@
+[Icon Theme]
+Name=SnowLinux
+Comment=SnowLinux icons (original artwork)
+Inherits=Papirus-mxblue,Papirus,hicolor
+Directories=scalable/places,scalable/devices,scalable/mimetypes,scalable/apps
+
+[scalable/places]
+Size=64
+MinSize=16
+MaxSize=512
+Type=Scalable
+Context=Places
+
+[scalable/devices]
+Size=64
+MinSize=16
+MaxSize=512
+Type=Scalable
+Context=Devices
+
+[scalable/mimetypes]
+Size=64
+MinSize=16
+MaxSize=512
+Type=Scalable
+Context=MimeTypes
+
+[scalable/apps]
+Size=64
+MinSize=16
+MaxSize=512
+Type=Scalable
+Context=Applications
