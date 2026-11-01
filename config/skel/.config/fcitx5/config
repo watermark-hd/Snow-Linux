@@ -1,0 +1,24 @@
+# 日本語入力 (fcitx 5) のキー操作。Mac の「英数」「かな」に合わせる。
+#   無変換 / 英数  → 英数 (日本語入力を切る)
+#   変換  / かな   → かな (日本語入力を入れる)
+#   半角/全角      → 入/切を切り替える (トグル。Windows のキーボード向け)
+# Ctrl+Space は、Spotlight 風のランチャーに使うので、入力の切り替えには使わない。
+
+[Hotkey]
+EnumerateWithTriggerKeys=True
+EnumerateSkipFirst=False
+
+[Hotkey/TriggerKeys]
+0=Zenkaku_Hankaku
+
+[Hotkey/ActivateKeys]
+0=Henkan_Mode
+1=Hiragana
+
+[Hotkey/DeactivateKeys]
+0=Muhenkan
+1=Eisu_toggle
+
+[Behavior]
+ActiveByDefault=False
+ShareInputState=No

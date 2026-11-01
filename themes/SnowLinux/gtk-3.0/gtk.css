@@ -2,6 +2,7 @@
  * 土台は Greybird (Xfce 標準)。その上に、Mac OS X 10.4〜10.6 の雰囲気になる上書きを重ねる。
  * 画像は使わず、グラデーションだけで描く (軽くするため)。
  */
+/* rev: 2026-11-02 menu-text-fix */
 @import url("file:///usr/share/themes/Greybird/gtk-3.0/gtk.css");
 
 @define-color snow_blue_top #6fa8f2;
@@ -113,9 +114,16 @@ menu separator { margin: 3px 0; }
 .xfce4-panel button { background-image: none; background-color: transparent; border: none; box-shadow: none; text-shadow: none; padding: 0 7px; min-height: 0; border-radius: 0; color: #000; }
 .xfce4-panel button:hover, .xfce4-panel button:checked { background-image: linear-gradient(to bottom, @snow_blue_top, @snow_blue_bottom); color: #fff; }
 .xfce4-panel menubar, .xfce4-panel menubar > menuitem { background-image: none; background-color: transparent; border: none; box-shadow: none; text-shadow: none; }
-.xfce4-panel menubar > menuitem:hover { background-image: linear-gradient(to bottom, @snow_blue_top, @snow_blue_bottom); color: #fff; }
+.xfce4-panel menubar > menuitem:hover, .xfce4-panel menubar > menuitem:checked { background-image: linear-gradient(to bottom, @snow_blue_top, @snow_blue_bottom); color: #fff; }
 .xfce4-panel label { color: #000; text-shadow: none; }
-.xfce4-panel button:hover label, .xfce4-panel button:checked label, .xfce4-panel menubar > menuitem:hover label { color: #fff; }
+/* 白い文字にするのは、項目の直接の子の文字だけ。
+ * (開いているプルダウンの中の項目も、「子孫」として見なされるため、直接の子に絞らないと、プルダウンの中の文字まで白になる) */
+.xfce4-panel button:hover > label, .xfce4-panel button:checked > label, .xfce4-panel button:hover > box > label, .xfce4-panel button:checked > box > label,
+.xfce4-panel menubar > menuitem:hover > label, .xfce4-panel menubar > menuitem:checked > label { color: #fff; }
+/* プルダウンの中は、いつでも黒い文字 (ポインターを乗せた行だけ白) */
+.xfce4-panel menu, .xfce4-panel menu menuitem, .xfce4-panel menu menuitem label, .xfce4-panel menu menuitem * { color: #1e1e1e; text-shadow: none; }
+.xfce4-panel menu menuitem:disabled, .xfce4-panel menu menuitem:disabled label { color: #9a9a9a; }
+.xfce4-panel menu menuitem:hover, .xfce4-panel menu menuitem:hover label, .xfce4-panel menu menuitem:hover * { color: #ffffff; }
 
 /* ---------- スクロールバー ---------- */
 scrollbar { background-color: #f4f4f4; background-image: none; border: none; }

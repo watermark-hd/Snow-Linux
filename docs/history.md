@@ -231,3 +231,26 @@ SnowLinux 用スレッドでの相談・決定・作業の記録。新しいも�
 - 確認 (ユーザー): ブランドのあるアプリ (Firefox、LibreOffice、VLC など) のアイコンは、最初から入っているものでよい。メニューバーの細い線は、わざと付けたもので、必要ない → 消した (パネルの border を外した)。
 - ユーザーの気づき: MX Linux は見た目と機能のバランスがよい。見た目だけを変えると、機能が削られて使いにくくなり、バランスが悪くなる。「とことん OS X に近づけないと誰も納得しない」。まだ進める。
   - 対応: `docs/feature-map.md` (機能の行き先表) を作った。MX / Xfce の機能を 1 つずつ書き出し、SnowLinux のどこに行くかを決める。行き先のない機能は削らない。
+- ランチャー (Spotlight 風) を始めた。候補: rofi (すでに入っている、C 製、使うときだけ起動して常駐しない)、Ulauncher / Albert (常駐して数十 MB)。「キビキビ」の原則から rofi を選んだ。
+  - `config/skel/.config/rofi/spotlight.rasi`: 半透明の角丸の窓、大きな検索欄、アイコン付きの一覧、選択は青いグラデーション。`scripts/snowlinux-spotlight`: アプリ (名前で検索) と開いているウィンドウを 1 つの一覧に出す。もう一度押すと閉じる。`/usr/local/bin` に入れる。
+  - ショートカット: Ctrl+Space と Alt+F2 / Alt+F3 (MX の元は xfce4-appfinder)。`xfce4-keyboard-shortcuts.xml` は MX の元の設定に足す形。
+  - 日本語入力 (fcitx) の切り替えを 半角/全角 に移した (`config/skel/.config/fcitx/config`)。Ctrl+Space を Spotlight に使うため。
+  - テーマの構文は rofi で確認した (エラーなし)。画面での見た目は、snowtest で確認する。
+  - まだできていないこと: ファイル検索 (plocate の結果を一覧に出す)、計算、ウェブ検索、見た目の細かい調整。
+- ユーザーから: 終盤の細かい要求を出して混乱させてしまった、とのこと。→ 全体の途中なので、細かい見た目の調整は後で行う。いま大事なのは機能の行き先 (feature-map.md) を埋めること。
+- 不具合 (ユーザーの確認): メニューバーの文字は黒だが、プルダウンを開くと、プルダウンの中の文字が白くなって、ほとんど読めない。
+  - 原因: メニューバーの項目にポインターを乗せたときの白い文字の指定 (`.xfce4-panel menubar > menuitem:hover label`) が、開いているプルダウンの中の文字にも効いていた。GTK3 では、メニューを開いている間、その中の項目は、開いた項目の「子孫」として CSS のセレクターに一致する。
+  - 対処: 白い文字を「直接の子」の文字だけ (`>`) に絞った。プルダウンの中は、いつでも黒い文字、ポインターを乗せた行だけ白にした。
+  - 教訓: メニューやポップアップを持つ部品の状態 (`:hover` など) に対する、子孫のセレクターは、プルダウンの中まで効くので、直接の子に絞る。
+- 確認 (snowtest、スクリーンショットあり): ランチャー (Ctrl+Space) が動いた。「Fi」と打つだけで Firefox が出る。アプリケーションフォルダは問題なし。
+  - プルダウンの文字: まだ白いままだった (スクリーンショット)。CSS の計算結果を数値で確認したところ、直す前は #ffffff、直した後は #1e1e1e。ユーザーの snowtest には、まだ直したテーマが反映されていない (`apply-to-snowtest.sh` を実行して、ログインし直す必要がある)。
+  - 「Mac っぽくない」: 原因はひとつではなさそう。疑わしいもの: ① 文字の描画 (Mac は灰色の文字でヒンティングなし、Linux は液晶の色つき文字 + ヒンティング)、② フォント (Lucida Grande は幅が広い。Noto Sans は細い。DejaVu Sans のほうが近いかもしれない。日本語は Hiragino に対して Noto Sans CJK JP)、③ サイドバーの見出し (Mac は小さく灰色、Thunar は太字の黒)、④ ツールバー (Finder は一体型でアイコンと文字、セグメント化されたボタン)。フォントの比較の画像 (A: 今の設定、B: 灰色の文字 + ヒンティングなし、C: DejaVu Sans) を作った。実画面で、ユーザーに試してもらう。
+  - 日本語入力: 半角/全角で切り替わるが、テキストエディター (FeatherPad) では英数しか入らない。原因: FeatherPad は Qt6。fcitx 4 には Qt6 用の部品がない (Qt5 用のみ)。Firefox (GTK) は動く。対策: fcitx 5 に移す (Debian 13 に fcitx5、fcitx5-mozc、fcitx5-frontend-gtk3 / qt5 / qt6 がある)。
+- プルダウンの白い文字が「まだ変わっていない」件: snowtest に実際に入っているテーマ (`/home/snowtest/.themes/SnowLinux/gtk-3.0/gtk.css`) を調べたところ、更新が 16:43 のままで、直し (`menuitem:hover > label`) が入っていなかった。直したテーマを、まだ `apply-to-snowtest.sh` で反映していなかった。
+  - 見つけた不具合: `apply-to-snowtest.sh` が `/home/snowtest` の権限を、skel のもの (775) に変えてしまっていた (他のユーザーから読める状態)。コピーのあとに `chmod 700` で戻すようにした。実際のインストールでは、skel は新しいユーザーのファイルにだけコピーされるので、この問題は起きない。
+  - 確認用に、テーマの先頭に `/* rev: ... */` の印を入れた (`grep rev ~/.themes/SnowLinux/gtk-3.0/gtk.css` で、入っているテーマの版が分かる)。
+- 日本語入力: Qt6 で作られているアプリは、FeatherPad、nomacs、Strawberry、qpdfview の 4 つ (リストにあるアプリを調べた)。fcitx 4 には Qt6 用の部品がないので、この 4 つでは日本語が入らない。fcitx 5 に移せば、すべてのアプリで入る。fcitx 5 を snowtest だけで試す案 (watermark の日本語入力には影響しない: パッケージを足すだけで、ユーザーごとの設定 `~/.xinputrc` で切り替えるため)。
+- 日本語入力を fcitx 5 に移す (ユーザーの承認)。キーの割り当て: 無変換 = 英数 (日本語入力を切る)、変換 = かな (入れる)、半角/全角 = 入/切のトグル。ユーザーの watermark でも、Mac のキー操作に寄せるため、無変換 / 変換を使っている。Mac のキーボード向けに、英数 (Eisu_toggle)・かな (Hiragana) も同じ動きにした。
+  - `config/skel/.config/fcitx5/config`、`profile` (キーボード jp + Mozc)、`config/skel/.xinputrc` (`run_im fcitx5`)。fcitx 4 の skel の設定は削除した。
+  - これから: パッケージの追加 (ユーザーが `sudo apt install ...` を実行)、snowtest で動作の確認、Mozc のキーマップを「ことえり」風にするか決める、メモリの使用量を測る。
+- 確認 (snowtest): fcitx 5 に移して、FeatherPad (Qt6) でも日本語が入るようになった。動作は fcitx 4 のときと変わらない。変換 / 無変換のキーの動きも問題なし。

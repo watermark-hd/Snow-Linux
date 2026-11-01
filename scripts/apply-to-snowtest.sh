@@ -47,6 +47,8 @@ mkdir -p /usr/share/backgrounds/SnowLinux
 cp "$root"/assets/wallpapers/*.jpg /usr/share/backgrounds/SnowLinux/
 
 chown -R "$user:$user" "/home/$user"
+# skel をコピーすると、ホームフォルダ自体の権限も skel のものになってしまうので、元の (他人に読めない) 権限に戻す
+chmod 700 "/home/$user"
 
 # dconf の設定 (Plank など)。snowtest として、一時的な D-Bus セッションで書き込む
 for f in "$root"/config/dconf/*.dconf; do
@@ -55,6 +57,9 @@ done
 
 # 起動ファイルを Thunar に信頼させる小さなスクリプト (ログインのたびに、自動起動から呼ばれる)
 install -m 755 "$root/scripts/snowlinux-trust-applications" /usr/local/bin/snowlinux-trust-applications
+
+# ランチャー (Spotlight 風)。rofi はすでに入っている
+install -m 755 "$root/scripts/snowlinux-spotlight" /usr/local/bin/snowlinux-spotlight
 
 # 「アプリケーション」フォルダ (システム全体で共通。実際のインストールでは、パッケージの更新のたびに作り直す)
 python3 "$root/scripts/gen-applications-folder.py" /Applications
