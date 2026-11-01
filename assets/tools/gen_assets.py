@@ -15,6 +15,19 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.abspath(os.path.join(HERE, ".."))
 
 
+def _gear(r_out=30, r_in=22, teeth=8, hole=9):
+    pts = []
+    for i in range(teeth * 2):
+        a0 = math.pi * 2 * i / (teeth * 2)
+        a1 = math.pi * 2 * (i + 1) / (teeth * 2)
+        r = r_out if i % 2 == 0 else r_in
+        pts.append((r * math.cos(a0 - 0.12), r * math.sin(a0 - 0.12)))
+        pts.append((r * math.cos(a1 - 0.30), r * math.sin(a1 - 0.30)))
+    d = "M" + "L".join(f"{x:.1f} {y:.1f}" for x, y in pts) + "Z"
+    return d + f"M{hole} 0a{hole} {hole} 0 1 0 -{hole * 2} 0a{hole} {hole} 0 1 0 {hole * 2} 0Z"
+
+
+
 def out(*parts):
     p = os.path.join(ASSETS, *parts)
     os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -197,6 +210,72 @@ G_APPS = '<path d="M0-16L-13 14h5l2.5-7h11L8 14h5zM-3.5 3L0-7l3.5 10z" fill-rule
 G_UTIL = '<path d="M-15-2a15 15 0 0 1 21-14l-9 9 4 4 9-9a15 15 0 0 1-14 21L-8 14l-7-7z"/>'
 
 
+G_CLOCK = '<circle r="15" fill="none" stroke="#fff" stroke-width="5"/><path d="M0-8V1l7 4" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/>'
+G_GLOBE = '<circle r="16" fill="none" stroke="#fff" stroke-width="4"/><ellipse rx="7" ry="16" fill="none" stroke="#fff" stroke-width="3"/><path d="M-16 0h32M-13-9h26M-13 9h26" stroke="#fff" stroke-width="3"/>'
+G_LOCK = '<rect x="-13" y="-4" width="26" height="20" rx="3"/><path d="M-8-4v-6a8 8 0 0 1 16 0v6" fill="none" stroke="#fff" stroke-width="5"/>'
+G_STAR = '<path d="M0-17l5 11 12 1-9 8 3 12-11-6-11 6 3-12-9-8 12-1z"/>'
+G_MAIL = '<rect x="-17" y="-11" width="34" height="23" rx="3"/><path d="M-17-8l17 12 17-12" fill="none" stroke="#4b8de2" stroke-width="3"/>'
+G_USER = '<circle cy="-8" r="8"/><path d="M-16 16q0-17 16-17t16 17z"/>'
+G_SYNC = '<path d="M-14 2a14 14 0 0 1 24-10M14-2a14 14 0 0 1-24 10" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M12-16v10H2zM-12 16V6h10z"/>'
+G_CAM = '<path d="M-17-7h9l3-6h10l3 6h9q3 0 3 3v17q0 3-3 3h-34q-3 0-3-3V-4q0-3 3-3z"/><circle cy="4" r="7" fill="#4b8de2"/>'
+G_SHARE = '<circle cx="-11" cy="0" r="6"/><circle cx="10" cy="-11" r="6"/><circle cx="10" cy="11" r="6"/><path d="M-11 0L10-11M-11 0L10 11" stroke="#fff" stroke-width="3"/>'
+G_GEARF = '<g transform="scale(.5)">' + f'<path d="{_gear()}" fill-rule="evenodd"/></g>'
+G_ARCH = '<rect x="-17" y="-16" width="34" height="12" rx="2"/><path d="M-14-2h28v16q0 3-3 3h-22q-3 0-3-3z"/>'
+G_WRENCHF = '<g transform="scale(.5)"><path d="M-30 0a30 30 0 0 1 40-28l-17 17 9 9 17-17a30 30 0 0 1-28 40L-24 24l-12-12z"/></g>'
+G_NET = '<rect x="-16" y="-14" width="32" height="20" rx="2"/><path d="M-4 6h8v6h-8zM-14 12h28" stroke="#fff" stroke-width="3"/>'
+
+FOLDER_NAMES = {
+    "": ["folder", "inode-directory", "inode-directory_", "folder-open", "folder-new", "folder_new", "folder_open", "folder-add",
+         "folder-copy", "folder-move", "folder-drag-accept", "folder-visiting", "folder-saved-search", "folder-x-gnome-saved-search",
+         "folder-activities", "gnome-folder", "gnome-fs-directory", "gnome-fs-directory-accept", "gnome-fs-directory-visiting",
+         "gnome-mime-inode-directory", "folder-git", "folder-github", "folder-gnome", "folder-linux", "folder-red", "folder-vbox", "folder-wine", "folder-steam",
+         "folder-dropbox", "folder-cloud", "folder-gdrive", "folder-owncloud", "folder-mega", "folder-meocloud", "folder-yandex-disk", "folder-apple"],
+    "home": ["user-home", "folder-home", "folder_home", "gnome-home", "gnome-fs-home"],
+    "desk": ["user-desktop", "folder-desktop", "gnome-fs-desktop"],
+    "doc": ["folder-documents", "folders-documents", "folder-text", "folder-txt"],
+    "down": ["folder-download", "folder-downloads", "folder_download", "folder_downloads", "folders-download", "folders-downloads"],
+    "music": ["folder-music", "folder-sound"],
+    "pic": ["folder-pictures", "folder-picture", "folder-photos", "folder-photo", "folder-foto", "folder-fotos", "folder-image", "folder-images",
+            "folder_images", "folder_photos", "folder_pictures", "folder-image-people"],
+    "video": ["folder-videos", "folder-video", "folder-videocamera"],
+    "clock": ["folder-recent", "folder-temp"],
+    "globe": ["folder-web", "folder-html", "folder-network", "folder-remote", "folder-remote-ftp", "folder-remote-nfs", "folder-remote-smb",
+              "folder-remote-ssh", "folder-remote-afp", "gnome-fs-ftp", "gnome-fs-network", "gnome-fs-nfs", "gnome-fs-smb", "gnome-fs-ssh", "network-workgroup"],
+    "share": ["folder-public", "folder-publicshare", "folder-sync", "folder-network-server"],
+    "lock": ["folder-locked", "folder-private"],
+    "star": ["folder-favorites", "folder-important", "user-bookmarks", "gnome-fs-bookmark"],
+    "mail": ["folder-mail", "folder-mail-cloud"],
+    "user": ["folder-user", "folder-root"],
+    "cam": ["folder-camera"],
+    "gearf": ["folder-settings", "folder-script", "folder-templates"],
+    "arch": ["folder-tar", "folder-torrents"],
+    "wrench": ["folder-development", "folder-java"],
+    "print": ["folder-print", "folder-printer"],
+}
+FOLDER_GLYPHS = {"": "", "home": G_HOME, "desk": G_DESK, "doc": G_DOC, "down": G_DOWN, "music": G_MUSIC, "pic": G_PIC, "video": G_VIDEO,
+                 "clock": G_CLOCK, "globe": G_GLOBE, "share": G_SHARE, "lock": G_LOCK, "star": G_STAR, "mail": G_MAIL, "user": G_USER,
+                 "cam": G_CAM, "gearf": G_GEARF, "arch": G_ARCH, "wrench": G_WRENCHF, "print": G_DOC}
+
+
+def computer(laptop=False):
+    defs = lin("b", [(0, "#f4f4f4"), (1, "#b9b9b9")]) + lin("s", [(0, "#8fc3fb"), (0.6, "#3f84e0"), (1, "#2a5fb8")])
+    if laptop:
+        body = ('<ellipse cx="64" cy="108" rx="52" ry="5" fill="#000" fill-opacity="0.2"/>'
+                '<rect x="22" y="22" width="84" height="58" rx="5" fill="url(#b)" stroke="#6d6d6d" stroke-width="2"/>'
+                '<rect x="28" y="28" width="72" height="46" rx="2" fill="url(#s)" stroke="#173f86"/>'
+                '<path d="M28 28h72v18q-36 14-72 0z" fill="#fff" fill-opacity="0.3"/>'
+                '<path d="M10 84h108l-6 16q-1 3-4 3H20q-3 0-4-3z" fill="url(#b)" stroke="#6d6d6d" stroke-width="2"/>'
+                '<rect x="50" y="86" width="28" height="3" rx="1.5" fill="#8a8a8a"/>')
+    else:
+        body = ('<ellipse cx="64" cy="116" rx="40" ry="5" fill="#000" fill-opacity="0.2"/>'
+                '<rect x="14" y="12" width="100" height="78" rx="7" fill="url(#b)" stroke="#6d6d6d" stroke-width="2"/>'
+                '<rect x="22" y="20" width="84" height="56" rx="2" fill="url(#s)" stroke="#173f86"/>'
+                '<path d="M22 20h84v24q-42 16-84 0z" fill="#fff" fill-opacity="0.3"/>'
+                '<path d="M52 90h24l4 22H48z" fill="url(#b)" stroke="#6d6d6d" stroke-width="2"/>'
+                '<rect x="34" y="110" width="60" height="6" rx="3" fill="url(#b)" stroke="#6d6d6d" stroke-width="2"/>')
+    return svg(body, defs)
+
+
 def trash(full=False):
     defs = lin("m", [(0, "#a9a9a9"), (0.25, "#f2f2f2"), (0.55, "#cfcfcf"), (1, "#8d8d8d")], 0, 0, 1, 0)
     paper = ('<path d="M44 38l8-14 12 8 10-12 12 14z" fill="#fff" stroke="#bbb"/>'
@@ -274,18 +353,6 @@ def filemanager():
 # ======================================================================
 # ユーティリティのアプリのアイコン: 銀色の角丸 + 機能ごとの図柄
 # ======================================================================
-
-def _gear(r_out=30, r_in=22, teeth=8, hole=9):
-    pts = []
-    for i in range(teeth * 2):
-        a0 = math.pi * 2 * i / (teeth * 2)
-        a1 = math.pi * 2 * (i + 1) / (teeth * 2)
-        r = r_out if i % 2 == 0 else r_in
-        pts.append((r * math.cos(a0 - 0.12), r * math.sin(a0 - 0.12)))
-        pts.append((r * math.cos(a1 - 0.30), r * math.sin(a1 - 0.30)))
-    d = "M" + "L".join(f"{x:.1f} {y:.1f}" for x, y in pts) + "Z"
-    return d + f"M{hole} 0a{hole} {hole} 0 1 0 -{hole * 2} 0a{hole} {hole} 0 1 0 {hole * 2} 0Z"
-
 
 # 図柄は、中心を (0,0)、おおよそ ±32 に収める。fill="currentColor" は、濃い青灰色で描かれる。
 GLYPHS = {
@@ -373,18 +440,29 @@ def read_icon_names():
 
 def generate_icons(root):
     files = {}
-    # 場所
-    for name, glyph in (("folder", ""), ("inode-directory", ""), ("folder-open", ""),
-                        ("user-home", G_HOME), ("folder-documents", G_DOC), ("folder-download", G_DOWN),
-                        ("folder-music", G_MUSIC), ("folder-pictures", G_PIC), ("folder-videos", G_VIDEO),
-                        ("user-desktop", G_DESK), ("folder-applications", G_APPS), ("folder-utilities", G_UTIL)):
-        files[f"scalable/places/{name}.svg"] = folder(glyph)
+    # 場所 (フォルダ関連の名前は、すべて青いフォルダにする。Papirus の茶色や黄色のフォルダが混ざらないように)
+    for key, names in FOLDER_NAMES.items():
+        content = folder(FOLDER_GLYPHS[key])
+        for name in names:
+            files[f"scalable/places/{name}.svg"] = content
+    files["scalable/places/folder-applications.svg"] = folder(G_APPS)
+    files["scalable/places/folder-utilities.svg"] = folder(G_UTIL)
     files["scalable/places/user-trash.svg"] = trash(False)
     files["scalable/places/user-trash-full.svg"] = trash(True)
+    for name in ("gnome-fs-trash-empty", "gnome-stock-trash"):
+        files[f"scalable/places/{name}.svg"] = trash(False)
+    for name in ("gnome-fs-trash-empty-accept", "gnome-stock-trash-full", "user-trash-full-orig"):
+        files[f"scalable/places/{name}.svg"] = trash(True)
     # 機器
     files["scalable/devices/drive-harddisk.svg"] = harddisk()
     files["scalable/devices/drive-removable-media.svg"] = usbdrive()
     files["scalable/devices/media-optical.svg"] = optical()
+    for name in ("computer", "gnome-computer", "gnome-dev-computer"):
+        files[f"scalable/places/{name}.svg"] = computer(False)
+        files[f"scalable/devices/{name}.svg"] = computer(False)
+    for name in ("computer-laptop",):
+        files[f"scalable/places/{name}.svg"] = computer(True)
+        files[f"scalable/devices/{name}.svg"] = computer(True)
     # ファイル
     files["scalable/mimetypes/text-x-generic.svg"] = page("text")
     files["scalable/mimetypes/image-x-generic.svg"] = page("image")

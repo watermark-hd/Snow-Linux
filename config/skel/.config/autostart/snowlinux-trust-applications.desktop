@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=SnowLinux: trust application launchers
+Exec=snowlinux-trust-applications
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

@@ -53,6 +53,9 @@ for f in "$root"/config/dconf/*.dconf; do
     [ -f "$f" ] && sudo -u "$user" -H dbus-run-session -- dconf load / < "$f"
 done
 
+# 起動ファイルを Thunar に信頼させる小さなスクリプト (ログインのたびに、自動起動から呼ばれる)
+install -m 755 "$root/scripts/snowlinux-trust-applications" /usr/local/bin/snowlinux-trust-applications
+
 # 「アプリケーション」フォルダ (システム全体で共通。実際のインストールでは、パッケージの更新のたびに作り直す)
 python3 "$root/scripts/gen-applications-folder.py" /Applications
 

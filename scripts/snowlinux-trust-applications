@@ -1,0 +1,24 @@
+#!/bin/bash
+# 「アプリケーション」フォルダの起動ファイル (.desktop) を、Thunar が「信頼できる起動ファイル」として表示するようにする。
+# Thunar は、ユーザーごとに記録された信頼の印 (metadata::xfce-exe-checksum = 中身の SHA-256) がないと、
+# 起動ファイルをアプリ (名前とアイコン) として表示しない。印はユーザーごとなので、ログインのたびに付ける。
+# 使い方: snowlinux-trust-applications [フォルダ (既定: /Applications)]
+set -eu
+
+dir="${1:-/Applications}"
+[ -d "$dir" ] || exit 0
+
+# 前回から変更がなければ何もしない (ログインを遅くしないため)
+stamp="${XDG_CACHE_HOME:-$HOME/.cache}/snowlinux-trust-applications.stamp"
+if [ -f "$stamp" ] && [ -z "$(find "$dir" -newer "$stamp" -print -quit)" ]; then
+    exit 0
+fi
+
+find "$dir" -maxdepth 2 -name '*.desktop' -type f | while read -r f; do
+    sum="$(sha256sum "$f" | cut -d' ' -f1)"
+    cur="$(gio info -a metadata::xfce-exe-checksum "$f" 2>/dev/null | sed -n 's/^ *metadata::xfce-exe-checksum: //p')"
+    [ "$cur" = "$sum" ] || gio set -t string "$f" metadata::xfce-exe-checksum "$sum" 2>/dev/null || true
+done
+
+mkdir -p "$(dirname "$stamp")"
+touch "$stamp"

@@ -108,7 +108,7 @@ menu separator { margin: 3px 0; }
 .xfce4-panel.background {
   background-color: #dcdcdc;
   background-image: linear-gradient(to bottom, #fafafa 0%, #e6e6e6 50%, #d0d0d0 100%);
-  border-bottom: 1px solid #7a7a7a; color: #000;
+  border: none; color: #000;
 }
 .xfce4-panel button { background-image: none; background-color: transparent; border: none; box-shadow: none; text-shadow: none; padding: 0 7px; min-height: 0; border-radius: 0; color: #000; }
 .xfce4-panel button:hover, .xfce4-panel button:checked { background-image: linear-gradient(to bottom, @snow_blue_top, @snow_blue_bottom); color: #fff; }
