@@ -175,3 +175,12 @@ SnowLinux 用スレッドでの相談・決定・作業の記録。新しいも�
 - 初回の Git コミットを作った (`c6223f4`、95 ファイル、ブランチは `main`)。コミットの作者は公開用の `watermark_hd` と GitHub の noreply メール (個人のメールは公開しない)。
 - GitHub のリポジトリ: https://github.com/watermark-hd/Snow-Linux (公開、空の状態で作成)。`origin` に登録した。プッシュは、トークンをユーザーが入力して行う。
 - 注意 (公開リポジトリ): ライセンスのファイルがまだない。公開しても、ライセンスがないと他の人は法的に使えない。決める必要がある。
+- GitHub にプッシュした (https://github.com/watermark-hd/Snow-Linux、`main`、2 コミット)。トークンは Fine-grained、対象は Snow-Linux のみ、Contents を Read and write にして作成した。コミットの作者メールは noreply で、個人のメールは公開されていない。
+  - つまずいた点: ① Repository access が Public repositories のままだと Contents の権限を選べない (Only select repositories にする)。② 権限なしのトークンだと 403 になる。
+  - 今後: プッシュは「送って」と言われたときだけ行う。ライセンスと README の整備が必要 (公開したが、ライセンスのファイルがない)。
+- 3 (続き). アプリの整理を始めた。メニューに出るアプリは 159 個 → 4 つに分類した案を `docs/apps.md` にまとめた (アプリケーション / ユーティリティ / システム環境設定に統合 / 消す)。
+  - 決定: digiKam は外す (軽いもので代用)。Strawberry (音楽) は残す。Thunderbird は標準で入れる。
+  - 「消す」36 個を `config/hidden-apps.txt` に一覧し、`scripts/gen-hidden-apps.sh` で `config/skel/.local/share/applications/` に隠すためのファイルを作る。Gio で確認: メニューに出るアプリが 159 → 123 に減る。
+  - 「システム環境設定に統合」は、システム環境設定アプリを作るまで隠さない (隠すと Xfce の設定マネージャーからも消える可能性)。
+  - 気づき: VS Code は Flatpak 版 (`com.microsoft.VSCode`) のようだ。ISO への同梱の問題は、Flatpak で初回に入れる方法で解決できる可能性がある (要確認)。
+  - まだできていないこと: アプリケーションフォルダとユーティリティフォルダ (仮想のフォルダ) の実装。PhotoCraft / LightCraft の追加 (ライセンス確認が先)。

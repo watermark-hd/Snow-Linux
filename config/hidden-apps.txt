@@ -1,0 +1,58 @@
+# メニューから隠すアプリ (docs/apps.md の「消す」)。1 行に 1 つ、.desktop のファイル名 (拡張子なし)。
+# 生成: scripts/gen-hidden-apps.sh
+
+# ゲーム
+org.gnome.Mahjongg
+org.gnome.SwellFoop
+peg-e
+
+# 音楽 (CD リッピング)
+asunder
+
+# 電子書籍・ダウンロード
+com.github.johnfactotum.Foliate
+transmission-qt
+
+# 開発 (VS Code を標準にする)
+geany
+
+# 写真 (軽いもので代用する)
+org.kde.digikam
+
+# アクセシビリティ (自動で前に出てくる。必要な人は設定から)
+magnus
+onboard
+onboard-settings
+
+# ランチャー (Spotlight 役に置き換える)
+rofi
+rofi-theme-selector
+xfce4-appfinder
+xfce4-run
+
+# MX の案内 (SnowLinux 用に作り直す)
+about-mx-linux
+mx-welcome
+mx-tour
+FAQ
+Help
+info
+yelp
+xfce4-about
+
+# Conky
+mx-conky
+conky-toggle
+
+# 内部用・重複
+yad-settings
+yad-icon-browser
+fcitx
+gxkb
+libreoffice-base
+libreoffice-math
+libreoffice-startcenter
+xfce4-web-browser
+xfce4-file-manager
+xfce4-mail-reader
+xfce4-terminal-emulator
