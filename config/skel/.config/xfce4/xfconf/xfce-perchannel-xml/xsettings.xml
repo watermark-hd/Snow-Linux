@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<channel name="xsettings" version="1.0">
+  <property name="Gtk" type="empty">
+    <!-- ヘッダーバーのアプリでも信号機ボタンを左に -->
+    <property name="DecorationLayout" type="string" value="close,minimize,maximize:"/>
+  </property>
+</channel>

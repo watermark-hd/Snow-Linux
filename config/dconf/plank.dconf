@@ -1,0 +1,15 @@
+[net/launchpad/plank/docks/dock1]
+theme='SnowLinux'
+position='bottom'
+alignment='center'
+items-alignment='center'
+icon-size=48
+zoom-enabled=true
+zoom-percent=150
+hide-mode='none'
+show-dock-item=false
+lock-items=false
+pinned-only=false
+auto-pinning=true
+tooltips-enabled=true
+dock-items=['thunar.dockitem', 'firefox.dockitem', 'libreoffice-writer.dockitem', 'xfce4-terminal.dockitem', 'trash.dockitem']

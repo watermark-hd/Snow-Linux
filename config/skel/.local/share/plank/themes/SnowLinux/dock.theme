@@ -1,0 +1,32 @@
+# SnowLinux の Dock テーマ。ガラスの棚: 上が明るく、下に向かって青みのグレー
+# 半透明にするには、ウィンドウマネージャーのコンポジットが必要 (xfwm4.xml で有効にしている)
+
+[PlankTheme]
+TopRoundness=6
+BottomRoundness=0
+LineWidth=1
+OuterStrokeColor=28;;38;;55;;200
+FillStartColor=222;;232;;247;;135
+FillEndColor=118;;142;;178;;120
+InnerStrokeColor=255;;255;;255;;175
+
+[PlankDockTheme]
+HorizPadding=3
+TopPadding=-6
+BottomPadding=3
+ItemPadding=2.5
+IndicatorSize=5
+IconShadowSize=1
+# 跳ねるアニメーションは使わない (起動中はインジケーターだけで示す)
+UrgentBounceHeight=0.4
+LaunchBounceHeight=0
+ClickTime=150
+UrgentBounceTime=400
+LaunchBounceTime=0
+ActiveTime=150
+SlideTime=150
+FadeOpacity=1
+FadeTime=150
+HideTime=150
+ItemMoveTime=250
+CascadeHide=true

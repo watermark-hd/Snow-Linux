@@ -1,0 +1,7 @@
+{
+  "files.associations": {
+    "*.css": "css",
+    "*rc": "properties"
+  },
+  "files.eol": "\n"
+}

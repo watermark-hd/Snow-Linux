@@ -1,0 +1,46 @@
+#!/bin/bash
+# config/skel/ の内容をテスト用ユーザー snowtest のホームに反映する。
+# 使い方: sudo scripts/apply-to-snowtest.sh [--reset]
+#   --reset  先に snowtest の ~/.config と ~/.cache を消し、/etc/skel を入れ直して初回ログインの状態に戻す
+# snowtest がログイン中だと、ログアウト時に設定が上書きされるので実行しない。
+set -eu
+
+user=snowtest
+root="$(cd "$(dirname "$0")/.." && pwd)"
+skel="$root/config/skel"
+themes="$root/themes"
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "sudo で実行してください: sudo $0 [--reset]" >&2
+    exit 1
+fi
+# デスクトップが動いている間は、ログアウト時に設定が上書きされるので実行しない
+if pgrep -u "$user" -x 'xfce4-session|xfwm4|xfce4-panel' >/dev/null; then
+    echo "$user がログイン中です。ログアウトしてから実行してください。" >&2
+    exit 1
+fi
+# ログアウト後に dbus や gvfs などが残ることがあるので、片付ける
+loginctl terminate-user "$user" 2>/dev/null || true
+
+# 実際のインストールと同じく、MX Linux の初期設定 (/etc/skel) に SnowLinux の設定を重ねる
+if [ "${1:-}" = "--reset" ]; then
+    rm -rf "/home/$user/.config" "/home/$user/.cache"
+    cp -a --no-preserve=ownership /etc/skel/. "/home/$user/"
+fi
+
+cp -a --no-preserve=ownership "$skel"/. "/home/$user/"
+
+# テーマ: 実際のインストールでは /usr/share/themes に入れる。テストでは ~/.themes に置く
+mkdir -p "/home/$user/.themes"
+for t in "$themes"/*/; do
+    [ -d "$t" ] && cp -a --no-preserve=ownership "$t" "/home/$user/.themes/"
+done
+
+chown -R "$user:$user" "/home/$user"
+
+# dconf の設定 (Plank など)。snowtest として、一時的な D-Bus セッションで書き込む
+for f in "$root"/config/dconf/*.dconf; do
+    [ -f "$f" ] && sudo -u "$user" -H dbus-run-session -- dconf load / < "$f"
+done
+
+echo "$skel、$themes、dconf の設定を /home/$user に反映しました。"

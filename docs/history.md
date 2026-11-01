@@ -1,0 +1,174 @@
+# 作業履歴
+
+SnowLinux 用スレッドでの相談・決定・作業の記録。新しいものを下に追記する。
+
+## 2026-10-25
+
+- このスレッドを SnowLinux 専用にすると決めた。履歴は SnowLinux フォルダ (このファイル) に保存する。
+- README を確認した。ベースは MX Linux (Xfce)、ISO は MX Snapshot で作る。Apple の素材は使わない。開発はまだ始めていない。
+- 開発の前に詳細を詰めることにした。最初のテーマはフォント。目標の見た目は Mac OS X 10.4〜10.6。
+  - Linux でもフォントの描画 (FreeType + fontconfig) は細かく調整でき、Mac に近づけられると確認した。
+  - 調整できる点: ヒンティングを弱くする、ステムダークニングで字を少し太らせる、アンチエイリアスの方式、DPI と文字サイズ、代わりのフォント選び。
+  - 案: Tiger〜Snow Leopard の「フォントスムージング (標準/弱/中/強)」に似た設定パネルを自作する。
+  - 未決定: 欧文 UI・日本語・等幅に使う代わりのフォント。
+- ユーザーの今の Linux 機 (Xfce / X11, 1366x768, 96 DPI) で VS Code に表示されている文字は「問題なさそう」とのこと。これを基準にする。
+  - sans-serif と monospace は VL ゴシック、serif は IPA明朝
+  - ヒンティング: hintslight / アンチエイリアス: あり / サブピクセル: rgb / lcdfilter: default
+  - GTK の UI フォントが「Noto Traditional Nushu 10.5」(女書の文字用フォント) になっている。意図した設定ではなさそうなので要確認。
+- 女書はユーザーが選んだものではなかった (Noto に統一したつもりだった)。原因: Noto の日本語フォント (fonts-noto-cjk) が入っておらず、一覧にあった別の Noto を選んでいた。
+  - 中国の字形 (跳ね・払いが日本と違う) は読みにくいので避ける。Droid Sans Fallback と WenQuanYi は中国向けの字形。
+  - SnowLinux では fontconfig で「漢字は日本の字形を優先する」設定を必ず入れる。
+  - ユーザーが読みやすいのはヒラギノ角ゴシックと丸ゴシック。近いフリーフォントの候補:
+    - 角ゴ: Noto Sans CJK JP (Debian: fonts-noto-cjk)、BIZ UDPゴシック (fonts-morisawa-bizud-gothic)、Zen Kaku Gothic New (Google Fonts のみ)
+    - 丸ゴ: Zen Maru Gothic、M PLUS Rounded 1c (どちらも Google Fonts のみ、OFL なので同梱できる)、モトヤLマルベリ (fonts-motoya-l-maruberi)
+  - 未決定: 実際に見比べてから選ぶ。
+- ユーザーが fonts-noto-cjk と fonts-morisawa-bizud-gothic をインストールした。
+  - SnowLinux の fontconfig 設定を作った: [config/skel/.config/fontconfig/fonts.conf](../config/skel/.config/fontconfig/fonts.conf)
+    - 漢字は Noto Sans CJK JP で表示する (言語の指定がない文字は日本語として扱う)
+    - Droid Sans Fallback と WenQuanYi を指定されても Noto Sans CJK JP を先に使う
+    - 等幅は DejaVu Sans Mono (Menlo の元になったフォント)
+  - ユーザーの機械にも同じものを ~/.config/fontconfig/fonts.conf としてコピーした。
+  - Xfce の UI フォントを「Noto Sans CJK JP 10.5」に変えた (前は Noto Traditional Nushu 10.5)。
+  - 確認した: 骨・直・海 (日中で字形が違う字) は Noto Sans CJK JP で表示される。
+- ユーザーがブラウザで確認した: 「全く問題ない」。1366x768 の粗い画面でも見やすくなった。
+  - この fontconfig 設定を SnowLinux の初期設定として採用する。
+  - 低解像度で見やすいことが大事 (古い Mac の画面も 1024x768〜1280x854 くらい)。今の機械をテスト用の画面として使える。
+- フォントはこのまま進める (あとで変える可能性はある)。
+- Finder の方針を決めた (plan.md の「Finder (ファイルマネージャー) の方針」に記載)。
+  - 見た目は Finder にかなり近づける。Windows に慣れた人が戸惑う部分は選べるようにする。
+  - ボタンの位置: 左 / 右を選べる。
+  - 左のバー: Mac 風 / Windows 風のツリーを選べる。Thunar 4.20 には両方とも標準である。
+  - ファイルの表示: アイコン / 一覧 / カラム。カラムだけ自作。
+  - 切り替えは自作の設定アプリで行う。動作が重くならないことが条件。
+  - 提案 (未決定): キー操作 (Enter で開く・名前変更、切り取り) も Mac 風 / Windows 風で選べるようにする。最初の起動時にどちらで使うか選んでもらう。
+- 上の提案を採用した。役割の分け方:
+  - 最初の起動時に「どちらに慣れているか」を聞いて、まとめて設定してしまう。
+  - あとの変更は Mac 風の設定画面で各自が調整する。
+- インストール先についてのユーザーの見方: Windows 機に入れる人が多くなるはず。Mac を持っている人の多くは macOS のまま使う。
+  - Windows 機・Intel Mac: 質問する。初期の選択は機械に合わせる (Mac かどうかはハードウェアの情報で判断する)。
+  - PPC Mac: 質問せずに Mac 風で設定する。あとから設定画面で変えることはできる。
+- メニューバーと Dock の方針を決めた (plan.md の「メニューバーと Dock の方針」に記載)。
+  - ユーザーの感想: MX Linux のパネルはそれなりに便利だが、追加や挙動の変更に手間がかかる。メニューバーも Dock も完全に Mac 風にしたい。
+  - 最初から Mac と同じ配置にする。変更は Mac と同じく設定画面のチェックボックスで行う。
+  - 使える部品を確認した (MX 25 / Debian 13): xfce4-appmenu-plugin 25.04、appmenu-gtk3-module 25.04、plank 0.11.89。
+  - ロゴのメニューは自作のパネルプラグインにする。
+- 不具合: Thunar で文字がすべて □ になった (英数字も)。
+  - 原因: fonts.conf の「言語の指定がない文字は日本語として扱う」規則 (lang に文字列を追加する書き方) が GTK の文字描画を壊していた。ブラウザや VS Code は影響を受けていなかった。
+  - 対処: 規則を削除した。日本語の環境では自動で日本語の字形になるので不要だった。修正後、Thunar で正常に表示されることをスクリーンショットで確認し、骨・直・海が Noto Sans CJK JP で表示されることも確かめた。
+  - 教訓: フォント設定を変えたら、ブラウザだけでなく GTK のアプリ (Thunar・パネル) でも確認する。
+- 信号機ボタンを再現する (これがないと Mac 風にならない)。左右どちらに置くかは選べるようにする。右に置くときは閉じるボタンを右端にする。
+- Dock は Leopard / Snow Leopard の 3D の Dock を目標にする。奥行きのある半透明の板にアイコンが乗る形。今の iPhone 風にはしない。動作が重くなるなら考え直す。
+  - 候補: Plank を改造する / Cairo-Dock 3.6.0 (3D の板が標準だが重め)。
+- Dock は Plank を改造する方向に決めた。映り込みは PPC では重くなりそうなので。
+  - 3D の板へのこだわりは強くない。奥行きがありそうな板で十分。
+  - 映り込みはできたら入れる。できなければアイコンに影を付ける。重くなるならそれも削る。
+  - 起動中のアプリのインジケーターは必ず付ける。
+- SnowLinux のいちばん大事な原則を決めた (plan.md の「決定事項」と「キビキビさせるための方針」に記載)。
+  - ユーザーは元カメラマン。大量の写真を編集・書き出し・サイズ調整・プリントしてきた。古い機械でもこの流れを快適にしたい。
+  - 普段の操作は極限までキビキビさせる (マウスが遅れない、アプリを開くのに何分も待たない)。書き出しやフィルターの時間は機械の性能次第でよい。
+  - 対策の案: 重い処理の優先度を下げる、zram、earlyoom、bfq、サムネイルは軽く作る、PPC では軽いテーマ、写真の処理には libvips。
+- 今日の打ち合わせはここまで。次回の候補: キー操作 (Windows 機で Mac 風を選んだときの ⌘ キー)、写真用のアプリ選び、起動画面とログイン画面。
+
+## 2026-10-26
+
+- 開発環境の相談。M2 MacBook Air に移すか、今の機械で続けるか。
+  - 今の機械: ASUS VivoBook 14 E406SA、Celeron N3060 (2 コア)、メモリ 3.7GB (普段から 2.8GB 使用中)、eMMC 58GB (空き 32GB)、VT-x と KVM あり。OS は MX Linux 25 (Xfce)。microSD (128GB) は確認した時点では認識されていなかった。
+  - M2 は ARM なので、x86_64 の仮想マシンはエミュレーションになって遅い。MX Linux には ARM 版がない。
+  - 今の機械で仮想マシンを動かすと、メモリが足りなくて VS Code と同時には厳しい。
+  - 提案: 今の機械で続ける。テーマや設定は仮想マシンを使わず、この機械の「テスト用ユーザー」で試す (/etc/skel の初回ログインをそのまま再現できる)。ISO とインストールの確認は USB メモリから起動して行う。M2 への移行は今は不要。
+
+## 2026-10-27
+
+- 開発の場所を変えた。会話の履歴が保存される場所は起動したフォルダごとに分かれるので、今後は `~/developer/SnowLinux` で起動したこのスレッドを開発用にする。以前の履歴は `~/.claude/projects/-home-watermark-developer/` にある。
+- テスト用ユーザー `snowtest` を作った (`sudo adduser snowtest`)。警告 (`fuse` グループがない、`users` に重複) は無害。
+- snowtest に `config/skel/.config/fontconfig/fonts.conf` を入れてログインし、Thunar で文字化けが出ないことを確認した。それ以外の設定にはまだ触れていない。
+- 必要なパッケージの状況: earlyoom と zram-tools はインストール済み。plank、xfce4-appmenu-plugin、appmenu-gtk3-module、libvips-tools は未インストール。picom は状態が不明。
+- 次回の予定: Plank とグローバルメニューを入れ、Mac と同じ配置のパネル (`xfce4-panel.xml`) を `config/skel/` に作って snowtest で確認する。あわせて Git の初回コミットを作る。
+- 準備として、microSD の認識の確認と、ISO の起動確認用の USB メモリ (8GB 以上) の用意を依頼した。
+
+## 2026-10-28
+
+- PearOS との差別化を話した。PearOS は 2025 年末に Arch + KDE Plasma 6 で復活した最新 macOS 風のディストロ。Apple に近い素材を使い、未完成の機能があり、インストーラーはドライブ全体のみ。
+  - SnowLinux は対象が重ならない。強みは、古い機械でのキビキビ感、写真の流れ、PPC Mac で動く現行カーネルの Linux。
+  - 内容は plan.md の「差別化」に記載。
+- 決めたこと:
+  - 写真アプリは既存の軽いものを採用する。候補は PhotoCraft と LightCraft (本家に似ていて、操作もショートカットもほぼ同じ。未完成だが現時点でも実用的)。独自の写真アプリは作らない。
+  - 最初のリリースは x86_64 版。PPC 版のリリースは絶対条件だが、まず目標となる完成品を作るために後に回す。
+  - 「Snow Leopard」は説明文での言及にとどめる。名前の変更は将来の選択肢として残す。
+- PhotoCraft / LightCraft は deb で配布されているとのこと。ライセンス (ISO に同梱して配布できるか) は GitHub で確認する。
+- 絶対条件を決めた (plan.md の「絶対条件」に記載)。
+  - Mac OS X 10.4 (Tiger) 〜 10.6 (Snow Leopard) を使っていた人が違和感なく操作できる。ちょっと懐かしいと思える。
+  - 本家そっくりにして、「再現性がいまいち」と思わせない。ただし使いやすくなるなら思い切って機能を入れる。
+  - Linux 独自のアプリは余分なものをすべて消す。オフィスと写真関連は充実させる。
+  - システム環境設定もほぼ同じにする。Finder の内容 (アプリケーションフォルダ、ゴミ箱など) まで再現する。
+  - 「そっくり」は配置・操作・挙動・雰囲気のこと。素材は自作で、Apple のものは使わない。
+- 対象の範囲を訂正した: 「0.4〜10.6」は 10.4 (Tiger) 〜 10.6 (Snow Leopard) の打ち間違い。
+- 使用目的を決めた (plan.md の「使用目的」に記載)。ネット閲覧・YouTube、写真の閲覧と整理、ちょっとした〜少し本格的な写真編集、ちょっとした仕事の書類作りに集中する。ゲームと音楽編集は目指さない。VS Code は標準で入れる。
+  - 軽量で古い PC でもキビキビ動くこと、アプリの起動が早いことを改めて確認した。
+  - MX Tools など便利な管理ツールは、アプリケーションフォルダの中の「ユーティリティ」フォルダにひととおり入れる。
+- Tiger 調のメタルウィンドウも選べるようにする。
+- ディスプレイ調整アプリを自作する (必須)。測色器なしで、ガンマ・白色点などを目視で調整し、ICC プロファイルを作れる。x86 機のモニターの色がまちまちなので、写真を見るのに必要。Mac の ColorSync の詳細設定のようなイメージ。内容は plan.md の「ディスプレイ調整アプリ」に記載。
+- 確認事項: VS Code を ISO に同梱してよいか (Microsoft のライセンス)。
+- ディスプレイ調整アプリの方式を決めた。Mac の「ディスプレイの色調整アシスタント」と同じ、枠の中のリンゴを背景の縞と同じ明るさに見えるまでスライダーで合わせる方法。ハイライト・中間色・シャドーを R・G・B で行う。
+  - 仕組み: 黒と色の 1 ピクセル縞は光の量が半分になる。ベタ塗りのリンゴと同じに見える点を探せば、ディスプレイのガンマが分かる。
+  - 注意: 縞は 1 ピクセル単位で正確に描く (全画面、拡大なし、コンポジターを通さない)。分かるのはガンマと白色点まで。原色は sRGB を前提にする。
+  - 回数の確認: ユーザーは「3 段階 × RGB で計 6 回」と言ったが、3 × 3 なら 9 点。実装時にどちらにするか決める。
+- 調整の回数を決めた。本家は中間色とシャドーの 2 段階 × RGB = 6 回。SnowLinux は中間色とハイライトの間を足して 3 段階 × RGB = 9 点にする (案: 約 25% / 50% / 75%)。
+  - 理由: 肌色 (子どもの写真など) は中間色からハイライト寄りで見え方が決まる。この範囲を正確にしたい。
+  - 元写真家のこだわり: 肌色は G を引く → マゼンタを少し → B → 最後に R をほんの少し足す、の順で整えると自然になる。ケータイのアプリより自然に仕上がり、YMCK では難しい。この順番を調整の流れに取り入れる (plan.md に記載)。
+- 目標を確認した: 当時を過ごした人たちに向けて、Mac OS X Tiger〜Snow Leopard に追いつく OS を作る。「とりあえずこれを使っていれば問題ない」というデファクトスタンダードを目指す。
+  - ユーザーの感想: MX Linux はかなり快適で、土台を改造する理由がないくらい。だから土台は MX のまま、見た目と操作と写真の流れの仕上げに力を注ぐ。
+
+## 2026-11-01
+
+- Plank、xfce4-appmenu-plugin、appmenu-gtk3-module を入れた。`GTK_MODULES` は `/etc/profile.d/vala-panel-appmenu.sh` が自動で設定する。
+- `config/skel/` に上部メニューバー (高さ 22px) の `xfce4-panel.xml` と、Plank の自動起動を作った。`scripts/apply-to-snowtest.sh` で snowtest に反映できる。
+- 確認方法: ログアウトせずに `dm-tool switch-to-greeter` で snowtest に切り替えられる。メモリは空き約 900MB と余裕が少ないので、必要なら VS Code を閉じてから切り替える。
+- snowtest での結果: バー・Dock・グローバルメニュー (Thunar を開くとファイル・編集がバーに出る) は動いた。文字化けなし。直す点: アプリがないときの「xfdesktop」の表示がバーの中央に出る。
+  - 対処: appmenu プラグインの `expand` を false にした。
+- 信号機ボタンを左にする設定 (`xfwm4.xml` の `button_layout=CHM|`、`xsettings.xml` の `DecorationLayout`) を追加した。ボタンの見た目はまだ標準のまま。
+- 気づき: snowtest では MX の blueman-applet、nm-applet、mx-usb-unmounter、fcitx、tumblerd などが自動で起動する。「余分なものを消す」ときの整理の対象。
+- Thunar のメニュー (ファイル・編集) が、ログイン直後は出るが、しばらくすると消えて「xfdesktop」だけになる。
+  - 原因の候補 1: appmenu の `expand=false` だとプラグインの幅が足りなくなる → `expand=true` に戻し、空白の separator を外した。
+  - 原因の候補 2: ログイン後に自動で起動する Magnus (画面拡大ツール。`/etc/xdg/autostart/magnus-autostart.desktop`) がアクティブなウィンドウを奪う → `config/skel/.config/autostart/magnus-autostart.desktop` に `Hidden=true` を置いて自動起動を止めた。
+- 気づき: snowtest では Magnus のほか、onboard (画面キーボード)、orca (スクリーンリーダー) などアクセシビリティ系も自動起動の一覧にある。「余分なものを消す」ときに整理する。
+- Magnus (画面拡大) がログイン直後に開いてグローバルメニューが消える件の原因が分かった。
+  - MX の `/etc/skel/.config/autostart/magnus-autostart.desktop` に、Magnus を止める `Hidden=true` がもともと入っていた。`apply-to-snowtest.sh --reset` が `~/.config` ごと消していたため、この設定も消えて Magnus が起動していた。
+  - 対処: `--reset` のときは `/etc/skel` を入れ直してから SnowLinux の設定を重ねるようにした (実際のインストールと同じ形)。二重の Magnus 用ファイルは不要なので消した。
+  - 設計上の気づき: SnowLinux の初期設定は「MX の /etc/skel + config/skel の上書き」になる。MX の skel にある conky、mx-welcome なども、「余分なものを消す」ときの整理の対象。
+- パネルの separator は右側を押し出すために必要。appmenu の `expand` は false にして、separator に余白を任せる形に戻した。
+- appmenu の `expand=false` だと、プラグインの幅が足りずコンパクトモード (「Thunar」とだけ出て、押すとメニューがプルダウン) になることが分かった。メニューを並べて出すには `expand=true` が必要。`expand=true` + separator (expand) の形に戻した。残る問題: メニューのないアプリ (xfdesktop) では名前がバーの左半分の中央に寄る。メニューバー用のプラグインを自作するときに直す。
+- snowtest の初回ログインで MX Welcome (案内画面) が出る。MX の `/etc/skel/.config/autostart/mx-welcome.desktop` による。SnowLinux では置き換えるか消す。
+- グローバルメニューが GTK アプリ (Thunar) で出ない原因を特定した。`GTK_MODULES` が `canberra-gtk3-module` だけで、`appmenu-gtk-module` が入っていない。`/etc/profile.d/vala-panel-appmenu.sh` は LightDM のログインでは読まれない。Qt アプリ (テキストエディター) は GTK のモジュールが不要なので、メニューが出る。
+  - 対処: `config/skel/.xsessionrc` で `GTK_MODULES` に `appmenu-gtk-module` を足す。
+  - 確認方法: `thunar -q` のあと `GTK_MODULES=appmenu-gtk-module:canberra-gtk3-module thunar &` でメニューが出るか。
+  - 製品としては、ユーザー個別ではなく `/etc/X11/Xsession.d/` に置くほうがよい (システム側の設定は、あとで ISO 用にまとめる)。
+- 調査: `GTK_MODULES` に `appmenu-gtk-module` を足しても Thunar のメニューは出なかった。ただし、同じモジュールで xfce4-terminal はメニューをバーに渡せることを watermark 側で確認した (`_GTK_MENUBAR_OBJECT_PATH` が付く)。
+  - 仮説: Thunar 4.20 は、メニューバーが非表示のとき (`last-menubar-visible`)、モジュールが渡せるメニューを持たない。メニューバーを表示にすれば出るはず。
+  - 対処の案: `config/skel/.config/xfce4/xfconf/xfce-perchannel-xml/thunar.xml` (MX の元の thunar.xml のコピー) に `last-menubar-visible=true` を足した。
+- 失敗: 調査中、ユーザーの Thunar のウィンドウ (watermark のセッションの別プロセス) に `Ctrl+M` 等のキーを送ってしまった。メニューバーの表示が切り替わった可能性がある。ユーザーに確認を依頼した。
+- 確認: snowtest で Thunar を開くと、ファイル・編集などのメニューがメニューバーに出た (メニューバーを表示にしたとき)。GTK アプリのグローバルメニューは Thunar で動く。
+- 残っている課題: 何も開いていないとき (デスクトップが前にあるとき) は「xfdesktop」とだけ出て、メニューが出ない。Mac の Finder は、デスクトップでも「ファイル・編集・表示・移動・ウィンドウ・ヘルプ」が出る。
+  - 方針: メニューバーのプラグインを自作するときに、デスクトップが前にあるときは Finder 風の固定メニュー (Thunar の新規ウィンドウ、移動、ゴミ箱を空にするなど) を出す。名前は「xfdesktop」ではなく、Finder 役のアプリの名前にする (名前の候補は決まっていない)。
+- 訂正: グローバルメニューは以前から正常に出ていた。何も開いていないときに「xfdesktop」としか出ないのを、不具合と取り違えていた (デスクトップはメニューを持たないため、仕様どおり)。調査の過程で足した `.xsessionrc` (`GTK_MODULES` に appmenu-gtk-module) と Thunar の `last-menubar-visible` は、本当に必要かあとで見直す。
+- 作業の順番を決めた: 1. 信号機ボタンとウィンドウ枠 → 2. Dock の見た目 → 3. MX の余分な自動起動の整理。
+- 1. xfwm4 テーマ「SnowLinux」の最初の版を作った。
+  - `themes/tools/gen_xfwm4.py` が画像を生成する (pycairo + PIL)。出力は `themes/SnowLinux/xfwm4/`。
+  - 赤・黄・緑のジェル風のボタン (直径 13px、間隔 7px)。非アクティブはグレー。ポインターを乗せると記号 (×、−、＋) が出る。
+  - タイトルバーは高さ 22px のグレーのグラデーション、上の角は丸み 6px、枠は 1px のダークグレー。
+  - `xfwm4.xml` に `theme=SnowLinux`、`title_font=Sans 10` を設定。`apply-to-snowtest.sh` が `themes/` を `~/.themes` に入れる。
+- ボタンの見た目の粗さについて: 1366×768 の液晶のせいか、画像の作りのせいかは未確認。あとで実際の画面の拡大写真で確認する。
+- 2. Dock のテーマ「SnowLinux」の最初の版を作った (`config/skel/.local/share/plank/themes/SnowLinux/dock.theme`)。
+  - ガラスの棚: 上が明るく下に向かって青みのグレーになる半透明のグラデーション、上の角は丸み 6、内側に白い縁。跳ねるアニメーションなし (起動中はインジケーターだけ)。
+  - 半透明にはコンポジットが必要なので、`xfwm4.xml` で `use_compositing=true` にした (ウィンドウの影も有効、Dock の影・ポップアップの影は無効)。これが「キビキビ」に影響しないか、この機械 (Celeron N3060) で測る。
+  - Dock の設定: 位置は下、アイコン 48px、拡大 150%、自動で隠さない (`config/dconf/plank.dconf`)。左から Thunar (Finder 役)、Firefox、LibreOffice Writer、端末、ゴミ箱 (docklet)。並べるアプリは仮。
+  - `apply-to-snowtest.sh` が `config/dconf/*.dconf` を snowtest に書き込む (`dbus-run-session` + `dconf load`。一時的な場所で動作を確認済み)。
+  - まだできていないこと: 映り込み、3D の奥行き (plan.md の優先順位 2〜4)。Plank 本体の改造が必要になる。
+- Dock の確認: 動作は問題なし。ユーザーの案: 棚の左右の端を斜めに切ると 3D 風に見える (台形)。plan.md の Dock の節に追記した。見た目の調整は後で行う。
+- 3. 自動起動の整理を始めた。`/etc/xdg/autostart` と MX の `/etc/skel` の自動起動を調べ、不要なものは `config/skel/.config/autostart/` に `Hidden=true` のファイルを置いて止めた (Conky、MX Welcome、Clipman、Cleanup Notifier、gxkb、xfce-superkey、Startup-sound、restore-software-brightness、Spice vdagent)。
+  - 残すもの・理由は plan.md の「自動起動の整理」に記載。
+- 自動起動の整理を確認した (snowtest にログインして `ps` で確認)。止めたものは動いていない。
+  - 動いている主なもの (メモリ): xfwm4 100MB、tumblerd 83MB、mx-updater 81MB (Python)、xfdesktop 61MB、blueman 59MB、mx-usb-unmounter 49MB、plank 43MB。
+  - 気づき: mx-updater は大きい → 軽い自作の「ソフトウェア・アップデート」に置き換える案。tumblerd (サムネイル作成) は、写真の多いフォルダで重くなる原因 → 優先度を下げる、RAW は中の JPEG を使う、を最初に手を付ける候補にする。
+  - 注意: 重さを測るときは、watermark のセッションを閉じて、snowtest だけで測る (今は 2 つのセッションが動いていて、数字が実際より悪い)。
+- 1〜3 の作業 (ウィンドウ枠、Dock、自動起動の整理) の最初の版ができた。

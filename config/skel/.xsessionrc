@@ -1,0 +1,3 @@
+# グローバルメニュー: GTK アプリのメニューをメニューバーに渡すモジュールを読み込む
+# (/etc/profile.d の設定は LightDM のログインでは読まれないため、ここで指定する)
+export GTK_MODULES="appmenu-gtk-module${GTK_MODULES:+:$GTK_MODULES}"
