@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=System Preferences
+Name[ja]=システム環境設定
+Comment=Change settings for your computer
+Comment[ja]=コンピューターの設定を変更します
+Exec=snowlinux-system-preferences
+Icon=snowlinux-system-preferences
+Terminal=false
+Categories=Settings;
+Keywords=settings;preferences;設定;環境設定;

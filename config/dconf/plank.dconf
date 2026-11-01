@@ -12,4 +12,4 @@ lock-items=false
 pinned-only=false
 auto-pinning=true
 tooltips-enabled=true
-dock-items=['thunar.dockitem', 'firefox.dockitem', 'libreoffice-writer.dockitem', 'xfce4-terminal.dockitem', 'trash.dockitem']
+dock-items=['thunar.dockitem', 'firefox.dockitem', 'libreoffice-writer.dockitem', 'xfce4-terminal.dockitem', 'snowlinux-system-preferences.dockitem', 'trash.dockitem']

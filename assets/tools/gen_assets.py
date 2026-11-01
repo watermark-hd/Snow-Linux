@@ -374,6 +374,45 @@ GLYPHS = {
     "chip": '<rect x="-22" y="-22" width="44" height="44" rx="5"/><rect x="-11" y="-11" width="22" height="22" rx="3" fill="#e8e8e8"/><path d="M-12-30v8M0-30v8M12-30v8M-12 22v8M0 22v8M12 22v8M-30-12h8M-30 0h8M-30 12h8M22-12h8M22 0h8M22 12h8" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>',
     "wrench": '<path d="M-30 0a30 30 0 0 1 40-28l-17 17 9 9 17-17a30 30 0 0 1-28 40L-24 24l-12-12z"/>',
 }
+GLYPHS.update({
+    "appearance": '<rect x="-30" y="-26" width="60" height="52" rx="6"/><rect x="-24" y="-12" width="48" height="32" rx="2" fill="#e8e8e8"/><circle cx="-21" cy="-19" r="2.6" fill="#e8e8e8"/><circle cx="-13" cy="-19" r="2.6" fill="#e8e8e8"/><circle cx="-5" cy="-19" r="2.6" fill="#e8e8e8"/>',
+    "desktop": '<rect x="-30" y="-28" width="60" height="42" rx="4"/><path d="M-24 8l12-14 10 10 8-8 18 12z" fill="#e8e8e8"/><rect x="-11" y="19" width="22" height="6" rx="2"/>',
+    "dock": '<rect x="-27" y="-24" width="14" height="14" rx="3.5"/><rect x="-7" y="-24" width="14" height="14" rx="3.5"/><rect x="13" y="-24" width="14" height="14" rx="3.5"/><rect x="-32" y="4" width="64" height="20" rx="6" opacity="0.8"/>',
+    "spaces": '<rect x="-31" y="-28" width="28" height="24" rx="3"/><rect x="3" y="-28" width="28" height="24" rx="3" opacity="0.6"/><rect x="-31" y="4" width="28" height="24" rx="3" opacity="0.6"/><rect x="3" y="4" width="28" height="24" rx="3"/>',
+    "language": '<path d="M-30-24h34q4 0 4 4v20q0 4-4 4h-18l-10 9v-9h-6q-4 0-4-4v-20q0-4 4-4z"/><path d="M8-8h22q4 0 4 4v18q0 4-4 4h-4v9l-9-9H8q-4 0-4-4V-4q0-4 4-4z" opacity="0.55"/>',
+    "display": '<rect x="-31" y="-28" width="62" height="44" rx="4"/><rect x="-26" y="-23" width="52" height="34" rx="1.5" fill="#e8e8e8"/><path d="M-10 20h20l4 8h-28z"/>',
+    "keyboard": '<rect x="-32" y="-18" width="64" height="38" rx="5"/>' + "".join(f'<rect x="{x}" y="{y}" width="8" height="7" rx="1.5" fill="#e8e8e8"/>' for y in (-11, -1) for x in (-26, -15, -4, 7, 18)) + '<rect x="-20" y="9" width="40" height="7" rx="1.5" fill="#e8e8e8"/>',
+    "mouse": '<path d="M0-30q20 0 20 20v22q0 18-20 18t-20-18V-10q0-20 20-20z"/><path d="M0-30V-6M-20-6H20" stroke="#e8e8e8" stroke-width="3" fill="none"/>',
+    "speaker": '<path d="M-30-8h12l16-14V22L-18 8h-12z"/><path d="M8-12a14 14 0 0 1 0 24M16-22a26 26 0 0 1 0 44" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>',
+    "energy": '<path d="M0-30a20 20 0 0 1 12 36v8h-24v-8A20 20 0 0 1 0-30z"/><rect x="-10" y="18" width="20" height="5" rx="2"/><rect x="-6" y="25" width="12" height="5" rx="2"/>',
+    "printer": '<rect x="-20" y="-30" width="40" height="18" rx="2" opacity="0.6"/><rect x="-32" y="-14" width="64" height="30" rx="5"/><rect x="-20" y="8" width="40" height="22" rx="2" fill="#e8e8e8" stroke="currentColor" stroke-width="3"/>',
+    "network": '<circle r="30" fill="none" stroke="currentColor" stroke-width="5"/><ellipse rx="12" ry="30" fill="none" stroke="currentColor" stroke-width="4"/><path d="M-30 0H30M-26-14H26M-26 14H26" stroke="currentColor" stroke-width="4"/>',
+    "bluetooth": '<path d="M-14-16L16 12 2 26V-26L16-12-14 16" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>',
+    "sharing": '<circle cx="-20" cy="0" r="9"/><circle cx="18" cy="-20" r="9"/><circle cx="18" cy="20" r="9"/><path d="M-20 0L18-20M-20 0L18 20" stroke="currentColor" stroke-width="5"/>',
+    "users": '<circle cx="-12" cy="-12" r="11"/><path d="M-32 24q0-24 20-24t20 24z"/><circle cx="16" cy="-14" r="9" opacity="0.6"/><path d="M6 24q0-18 12-20t14 20z" opacity="0.6"/>',
+    "clock": '<circle r="30" fill="none" stroke="currentColor" stroke-width="6"/><path d="M0-17V1l12 8" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>',
+    "update": '<path d="M-7-30h14v22h11L0 10-18-8h11z"/><rect x="-30" y="16" width="60" height="12" rx="4"/>',
+    "access": '<circle r="30" fill="none" stroke="currentColor" stroke-width="5"/><circle cy="-14" r="5"/><path d="M-16-6h32M0-6V8M0 8L-9 22M0 8L9 22" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>',
+    "bell": '<path d="M0-30q16 0 16 18v10q0 8 8 14H-24q8-6 8-14v-10Q-16-30 0-30z"/><path d="M-7 22a7 7 0 0 0 14 0z"/>',
+    "moon": '<path d="M8-30a30 30 0 1 0 22 42A24 24 0 0 1 8-30z"/>',
+    "apps": "".join(f'<rect x="{x}" y="{y}" width="14" height="14" rx="3"/>' for y in (-27, -7, 13) for x in (-27, -7, 13)),
+    "list": "".join(f'<circle cx="-22" cy="{y}" r="4"/><rect x="-12" y="{y - 3}" width="40" height="6" rx="3"/>' for y in (-20, 0, 20)),
+    "window": '<rect x="-32" y="-26" width="64" height="52" rx="6"/><path d="M-32-12h64" stroke="#e8e8e8" stroke-width="3"/><circle cx="-24" cy="-19" r="2.6" fill="#e8e8e8"/><circle cx="-16" cy="-19" r="2.6" fill="#e8e8e8"/><circle cx="-8" cy="-19" r="2.6" fill="#e8e8e8"/>',
+    "color": '<circle cx="-12" cy="-10" r="18" fill="#e0463c" fill-opacity="0.85"/><circle cx="12" cy="-10" r="18" fill="#27a843" fill-opacity="0.85"/><circle cy="12" r="18" fill="#3d7be0" fill-opacity="0.85"/>',
+})
+
+# システム環境設定の項目 → (図柄, 図柄の色)。アイコンの名前は snowlinux-pref-<項目>
+_P, _H, _N, _S = "#2f5fb8", "#3a4a62", "#1f6f8b", "#555c66"
+PREF_ICONS = {
+    "appearance": ("appearance", _P), "desktop": ("desktop", _P), "dock": ("dock", _P), "spaces": ("spaces", _P),
+    "language": ("language", _P), "security": ("shield", _P),
+    "display": ("display", _H), "color": ("color", _H), "keyboard": ("keyboard", _H), "mouse": ("mouse", _H), "sound": ("speaker", _H),
+    "energy": ("energy", _H), "removable": ("disc", _H), "printers": ("printer", _H),
+    "network": ("network", _N), "bluetooth": ("bluetooth", _N), "sharing": ("sharing", _N),
+    "accounts": ("users", _S), "datetime": ("clock", _S), "update": ("update", _S), "timemachine": ("backup", _S), "startup": ("disk", _S),
+    "access": ("access", _S), "notifications": ("bell", _S), "screensaver": ("moon", _S), "defaults": ("apps", _S), "login": ("list", _S), "windows": ("window", _S),
+}
+
 
 # アプリの図柄の割り当て (.desktop のファイル名 → 図柄)
 APP_GLYPH = {
@@ -397,14 +436,14 @@ APP_GLYPH = {
 }
 
 
-def app_icon(glyph):
+def app_icon(glyph, color="#3a4a62"):
     defs = (lin("b", [(0, "#fbfbfb"), (0.55, "#d9d9d9"), (1, "#a9a9a9")]) +
             lin("g", [(0, "#ffffff"), (1, "#ffffff")]))
     body = (
         '<ellipse cx="64" cy="118" rx="42" ry="5" fill="#000" fill-opacity="0.18"/>'
         '<rect x="10" y="8" width="108" height="108" rx="24" fill="url(#b)" stroke="#6f6f6f" stroke-width="2"/>'
         '<path d="M14 40q0-28 26-28h48q26 0 26 28v0q-50 20-100 0z" fill="#fff" fill-opacity="0.45"/>'
-        f'<g transform="translate(64 62) scale(1.05)" color="#3a4a62" fill="#3a4a62">'
+        f'<g transform="translate(64 62) scale(1.05)" color="{color}" fill="{color}">'
         f'<g transform="translate(0 1.5)" fill="#fff" color="#fff" opacity="0.8">{GLYPHS[glyph]}</g>{GLYPHS[glyph]}</g>'
     )
     return svg(body, defs)
@@ -472,6 +511,9 @@ def generate_icons(root):
         files[f"scalable/apps/{name}.svg"] = fm
     for icon_name, glyph in read_icon_names().items():
         files[f"scalable/apps/{icon_name}.svg"] = app_icon(glyph)
+    for pref_id, (glyph, color) in PREF_ICONS.items():
+        files[f"scalable/apps/snowlinux-pref-{pref_id}.svg"] = app_icon(glyph, color)
+    files["scalable/apps/snowlinux-system-preferences.svg"] = app_icon("gear", "#3a4a62")
     for rel, content in files.items():
         p = os.path.join(root, rel)
         os.makedirs(os.path.dirname(p), exist_ok=True)

@@ -58,6 +58,10 @@ done
 # 起動ファイルを Thunar に信頼させる小さなスクリプト (ログインのたびに、自動起動から呼ばれる)
 install -m 755 "$root/scripts/snowlinux-trust-applications" /usr/local/bin/snowlinux-trust-applications
 
+# システム環境設定
+install -m 755 "$root/scripts/snowlinux-system-preferences" /usr/local/bin/snowlinux-system-preferences
+install -D -m 644 "$root/config/system/applications/snowlinux-system-preferences.desktop" /usr/local/share/applications/snowlinux-system-preferences.desktop
+
 # ランチャー (Spotlight 風)。rofi はすでに入っている
 install -m 755 "$root/scripts/snowlinux-spotlight" /usr/local/bin/snowlinux-spotlight
 

@@ -56,3 +56,6 @@ xfce4-web-browser
 xfce4-file-manager
 xfce4-mail-reader
 xfce4-terminal-emulator
+
+# システム環境設定 (SnowLinux 製) に置き換える
+xfce-settings-manager

@@ -1,0 +1,313 @@
+#!/usr/bin/env python3
+"""SnowLinux のシステム環境設定。
+
+Mac OS X (10.4〜10.6) のシステム環境設定のように、設定の項目をアイコンで並べる。
+項目を押すと、埋め込める Xfce の設定画面は同じウィンドウの中に出し、
+それ以外のツールは別のウィンドウで開く。上のバーに、戻る・進む・すべてを表示・検索がある。
+
+使い方:
+  snowlinux-system-preferences            一覧を開く
+  snowlinux-system-preferences --pane display   その項目を直接開く
+  snowlinux-system-preferences --screenshot FILE  一覧を画像に保存する (確認用)
+"""
+import subprocess
+import sys
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
+
+# (項目の ID, 名前, 起動の方法, 検索のことば)
+#   起動の方法: ("embed", [コマンド])  埋め込める Xfce の設定画面
+#               ("app", [コマンド])    別のウィンドウで開く
+#               ("desktop", "xxx.desktop")  起動ファイルから開く (管理者の権限が要るものなど)
+GROUPS = [
+    ("個人設定", [
+        ("appearance", "外観", ("embed", ["xfce4-appearance-settings"]), "テーマ フォント アイコン 色 スタイル"),
+        ("desktop", "デスクトップ", ("embed", ["xfdesktop-settings"]), "壁紙 背景 アイコン"),
+        ("dock", "Dock", ("app", ["plank", "--preferences"]), "ドック 拡大 位置 隠す"),
+        ("spaces", "ワークスペース", ("embed", ["xfwm4-workspace-settings"]), "仮想デスクトップ spaces 数"),
+        ("language", "言語とテキスト", ("app", ["fcitx5-config-qt"]), "日本語 入力 変換 キー ime mozc"),
+        ("security", "セキュリティ", ("desktop", "gufw.desktop"), "ファイアウォール 防御 firewall"),
+    ]),
+    ("ハードウェア", [
+        ("display", "ディスプレイ", ("embed", ["xfce4-display-settings"]), "解像度 明るさ 画面 モニター"),
+        ("color", "カラー", ("embed", ["xfce4-color-settings"]), "色 プロファイル icc 調整 ガンマ"),
+        ("keyboard", "キーボード", ("embed", ["xfce4-keyboard-settings"]), "ショートカット キー 配列"),
+        ("mouse", "マウスと\nトラックパッド", ("embed", ["xfce4-mouse-settings"]), "ポインター スクロール タップ"),
+        ("sound", "サウンド", ("app", ["pavucontrol"]), "音量 スピーカー マイク 入力 出力"),
+        ("energy", "省エネルギー", ("embed", ["xfce4-power-manager-settings"]), "電源 バッテリー スリープ 画面"),
+        ("removable", "リムーバブル\nメディア", ("app", ["thunar-volman-settings"]), "cd dvd usb 自動"),
+        ("printers", "プリンター", ("app", ["system-config-printer"]), "印刷 プリント ファクス"),
+    ]),
+    ("インターネットとネットワーク", [
+        ("network", "ネットワーク", ("app", ["nm-connection-editor"]), "wi-fi 無線 有線 vpn 接続"),
+        ("bluetooth", "Bluetooth", ("app", ["blueman-manager"]), "ペアリング 無線"),
+        ("sharing", "共有", ("desktop", "mx-samba-config.desktop"), "ファイル共有 samba windows"),
+    ]),
+    ("システム", [
+        ("accounts", "アカウント", ("desktop", "mx-user.desktop"), "ユーザー パスワード ログイン"),
+        ("datetime", "日付と時刻", ("desktop", "mx-datetime.desktop"), "時計 タイムゾーン"),
+        ("update", "ソフトウェア・\nアップデート", ("app", ["mx-updater"]), "更新 アップグレード"),
+        ("timemachine", "バックアップ", ("desktop", "timeshift-gtk.desktop"), "スナップショット 復元 timeshift"),
+        ("startup", "起動ディスク", ("desktop", "mx-boot-options.desktop"), "ブート 起動 grub"),
+        ("access", "アクセシビリティ", ("embed", ["xfce4-accessibility-settings"]), "ユニバーサルアクセス 見やすさ"),
+        ("notifications", "通知", ("embed", ["xfce4-notifyd-config"]), "お知らせ バナー"),
+        ("screensaver", "スクリーンセーバー", ("embed", ["xfce4-screensaver-preferences"]), "ロック 画面 待機"),
+        ("defaults", "標準のアプリ", ("embed", ["xfce4-mime-settings"]), "ブラウザ メール 関連付け"),
+        ("login", "起動項目", ("embed", ["xfce4-session-settings"]), "自動起動 ログイン項目 セッション"),
+        ("windows", "ウィンドウ", ("embed", ["xfwm4-settings"]), "ボタン 配置 フォーカス 動作"),
+    ]),
+]
+PANES = {pid: (name, how, kw) for _, items in GROUPS for pid, name, how, kw in items}
+
+CSS = b"""
+.pref-item { background-image: none; background-color: transparent; border: 1px solid transparent; box-shadow: none; padding: 6px 4px; border-radius: 6px; }
+.pref-item:hover { background-color: rgba(0,0,0,0.07); }
+.pref-item:active { background-color: rgba(0,0,0,0.16); box-shadow: none; }
+.pref-label { font-size: 10.5px; }
+.pref-grid { background-color: #ececec; }
+"""
+
+
+class Preferences:
+    def __init__(self):
+        self.history = [None]      # None = 一覧、そうでなければ項目の ID
+        self.pos = 0
+        self.proc = None
+        self.root = self.build()
+
+    # ---------- 画面 ----------
+    def build(self):
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        tb = Gtk.Toolbar()
+        tb.set_style(Gtk.ToolbarStyle.ICONS)
+        self.back = Gtk.ToolButton(icon_name="go-previous-symbolic")
+        self.fwd = Gtk.ToolButton(icon_name="go-next-symbolic")
+        self.back.set_tooltip_text("戻る")
+        self.fwd.set_tooltip_text("進む")
+        self.back.connect("clicked", lambda _b: self.go(-1))
+        self.fwd.connect("clicked", lambda _b: self.go(+1))
+        showall = Gtk.ToolButton(icon_name="view-grid-symbolic", label="すべてを表示")
+        showall.set_tooltip_text("すべてを表示")
+        showall.connect("clicked", lambda _b: self.open(None))
+        for w in (self.back, self.fwd, showall):
+            tb.insert(w, -1)
+        spacer = Gtk.SeparatorToolItem()
+        spacer.set_draw(False)
+        spacer.set_expand(True)
+        tb.insert(spacer, -1)
+        self.search = Gtk.SearchEntry()
+        self.search.set_placeholder_text("検索")
+        self.search.set_width_chars(22)
+        self.search.connect("search-changed", self.on_search)
+        item = Gtk.ToolItem()
+        item.add(self.search)
+        tb.insert(item, -1)
+        box.pack_start(tb, False, False, 0)
+
+        self.stack = Gtk.Stack()
+        self.stack.add_named(self.build_grid(), "grid")
+        self.pane_holder = Gtk.Box()
+        self.stack.add_named(self.pane_holder, "pane")
+        box.pack_start(self.stack, True, True, 0)
+        self.update_nav()
+        return box
+
+    def build_grid(self):
+        sw = Gtk.ScrolledWindow()
+        sw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        sw.set_min_content_height(520)
+        sw.set_min_content_width(760)
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        outer.get_style_context().add_class("pref-grid")
+        self.groups = []     # (見出しの行, flowbox, [(子, 検索の文字列)])
+        for gi_, (gname, items) in enumerate(GROUPS):
+            if gi_:
+                outer.pack_start(Gtk.Separator(), False, False, 0)
+            fb = Gtk.FlowBox()
+            fb.set_selection_mode(Gtk.SelectionMode.NONE)
+            fb.set_min_children_per_line(4)
+            fb.set_max_children_per_line(8)
+            fb.set_homogeneous(True)
+            fb.set_column_spacing(0)
+            fb.set_row_spacing(2)
+            fb.set_margin_start(10)
+            fb.set_margin_end(10)
+            fb.set_margin_top(8)
+            fb.set_margin_bottom(8)
+            children = []
+            for pid, name, how, kw in items:
+                btn = Gtk.Button()
+                btn.set_relief(Gtk.ReliefStyle.NONE)
+                btn.get_style_context().add_class("pref-item")
+                v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+                img = Gtk.Image.new_from_icon_name(f"snowlinux-pref-{pid}", Gtk.IconSize.DIALOG)
+                img.set_pixel_size(48)
+                lab = Gtk.Label(label=name)
+                lab.get_style_context().add_class("pref-label")
+                lab.set_line_wrap(True)
+                lab.set_max_width_chars(18)
+                lab.set_justify(Gtk.Justification.CENTER)
+                v.pack_start(img, False, False, 0)
+                v.pack_start(lab, False, False, 0)
+                btn.add(v)
+                btn.set_size_request(90, -1)
+                btn.connect("clicked", lambda _b, p=pid: self.open(p))
+                fb.add(btn)
+                children.append((btn.get_parent(), f"{name} {kw}".lower()))
+            outer.pack_start(fb, False, False, 0)
+            self.groups.append((fb, children))
+        sw.add(outer)
+        return sw
+
+    # ---------- 検索 ----------
+    def on_search(self, entry):
+        q = entry.get_text().strip().lower()
+        if self.pos != 0 or self.history[self.pos] is not None:
+            self.open(None)
+        for fb, children in self.groups:
+            shown = 0
+            for child, text in children:
+                ok = (not q) or all(w in text for w in q.split())
+                child.set_visible(ok)
+                shown += ok
+            fb.set_visible(shown > 0 or not q)
+
+    # ---------- 項目を開く ----------
+    def open(self, pane_id, push=True):
+        if push:
+            self.history = self.history[: self.pos + 1]
+            if self.history[-1] != pane_id:
+                self.history.append(pane_id)
+                self.pos += 1
+        self.show(pane_id)
+
+    def go(self, step):
+        n = self.pos + step
+        if 0 <= n < len(self.history):
+            self.pos = n
+            self.show(self.history[n])
+
+    def show(self, pane_id):
+        self.close_pane()
+        win = self.root.get_toplevel()
+        if pane_id is None:
+            self.stack.set_visible_child_name("grid")
+            if isinstance(win, Gtk.Window):
+                win.set_title("システム環境設定")
+        else:
+            name, how, _kw = PANES[pane_id]
+            kind, target = how
+            if kind == "embed":
+                self.embed(target)
+            elif kind == "desktop":
+                info = Gio.DesktopAppInfo.new(target)
+                if info:
+                    info.launch([], None)
+                self.back_to_grid_after_launch()
+                return
+            else:
+                self.launch(target)
+                self.back_to_grid_after_launch()
+                return
+            if isinstance(win, Gtk.Window):
+                win.set_title(name)
+        self.update_nav()
+
+    def back_to_grid_after_launch(self):
+        # 別のウィンドウで開いたので、こちらは一覧のまま (履歴には残さない)
+        self.history = self.history[: self.pos]
+        self.pos = max(0, len(self.history) - 1)
+        self.stack.set_visible_child_name("grid")
+        self.update_nav()
+
+    def launch(self, cmd):
+        try:
+            subprocess.Popen(cmd, start_new_session=True)
+        except OSError:
+            pass
+
+    def embed(self, cmd):
+        sock = Gtk.Socket()
+        self.pane_holder.pack_start(sock, True, True, 0)
+        self.pane_holder.show_all()
+        self.stack.set_visible_child_name("pane")
+        # 画面に出てから、埋め込み先の ID を渡して起動する
+        def start():
+            try:
+                self.proc = subprocess.Popen(cmd + ["--socket-id", str(sock.get_id())])
+            except OSError:
+                self.open(None, push=False)
+                return False
+            GLib.timeout_add(2500, self.check_started, sock, cmd)
+            return False
+        GLib.idle_add(start)
+        sock.connect("plug-removed", lambda _s: self.on_plug_removed())
+
+    def check_started(self, sock, cmd):
+        # 埋め込めなかった (すぐ終了した) 場合は、別のウィンドウで開く
+        if self.proc is not None and self.proc.poll() is not None and self.proc.returncode != 0:
+            self.launch(cmd)
+            self.back_to_grid_after_launch()
+            self.close_pane()
+        return False
+
+    def on_plug_removed(self):
+        # 設定画面が閉じられたら、一覧に戻る
+        GLib.idle_add(lambda: (self.open(None, push=False), self.update_nav(), False)[-1])
+        return False
+
+    def close_pane(self):
+        if self.proc is not None and self.proc.poll() is None:
+            self.proc.terminate()
+        self.proc = None
+        for child in self.pane_holder.get_children():
+            self.pane_holder.remove(child)
+            child.destroy()
+
+    def update_nav(self):
+        self.back.set_sensitive(self.pos > 0)
+        self.fwd.set_sensitive(self.pos < len(self.history) - 1)
+
+
+def main():
+    args = sys.argv[1:]
+    prefs = Preferences()
+    if "--screenshot" in args:
+        out = args[args.index("--screenshot") + 1]
+        Gtk.Settings.get_default().set_property("gtk-icon-theme-name", "SnowLinux")   # 確認用の環境ではテーマ名が未設定のため
+        win = Gtk.OffscreenWindow()
+        win.set_default_size(780, 600)
+        win.add(prefs.root)
+        win.show_all()
+
+        def snap():
+            win.get_pixbuf().savev(out, "png", [], [])
+            Gtk.main_quit()
+            return False
+        GLib.timeout_add(700, snap)
+        Gtk.main()
+        return
+    win = Gtk.Window(title="システム環境設定")
+    win.set_default_size(780, 600)
+    win.set_icon_name("snowlinux-system-preferences")
+    win.add(prefs.root)
+    win.connect("destroy", lambda _w: (prefs.close_pane(), Gtk.main_quit()))
+    win.show_all()
+    if "--pane" in args:
+        pid = args[args.index("--pane") + 1]
+        if pid in PANES:
+            prefs.open(pid)
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()
