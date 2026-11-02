@@ -1,16 +1,8 @@
 #!/bin/sh
 # SnowLinux のランチャー (Spotlight 風)。Ctrl+Space で呼ぶ。
-# アプリ (名前で検索) と、開いているウィンドウを、1 つの一覧に出す。使うときだけ起動して、終われば消える (常駐しない)。
-theme="$HOME/.config/rofi/spotlight.rasi"
-[ -f "$theme" ] || theme="/etc/skel/.config/rofi/spotlight.rasi"
-
-# すでに出ているなら閉じる (Ctrl+Space をもう一度押したとき)
-if pgrep -u "$(id -u)" -x rofi >/dev/null; then
-    pkill -u "$(id -u)" -x rofi
+# 本体は snowlinux-spotlightd (ログイン時から待機している)。ここでは、合図を送るだけ。
+# 待機していなければ、起動して、そのまま窓を出す。
+if pkill -USR1 -u "$(id -u)" -f 'snowlinux-spotlightd'; then
     exit 0
 fi
-
-exec rofi -show combi -modi combi -combi-modes drun,window \
-    -theme "$theme" -show-icons -icon-theme SnowLinux \
-    -matching fuzzy -sort -sorting-method fzf \
-    -drun-display-format '{name}' -window-format '{c} — {t}'
+exec snowlinux-spotlightd --show

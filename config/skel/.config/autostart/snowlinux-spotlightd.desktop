@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=SnowLinux: launcher (standby)
+Exec=snowlinux-spotlightd
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

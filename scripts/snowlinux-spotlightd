@@ -1,0 +1,440 @@
+#!/usr/bin/env python3
+"""SnowLinux のランチャー (Spotlight 風)。Ctrl+Space で呼ぶ。
+
+アプリ・開いているウィンドウ・ファイルを、1 文字ごとに、1 つの一覧に出す。
+GTK で作ってあるので、fcitx 5 の日本語入力がそのまま使える (rofi は X の古い入力方式に
+対応しておらず、日本語が打てなかった)。
+
+ログイン時に静かに起動して待機する (読み込みに 0.7 秒ほどかかるため、押してすぐ出すには、
+待機させておく必要がある)。呼び出しは snowlinux-spotlight (シグナルを送るだけの小さな sh)。
+
+  Enter       開く / 起動する / ウィンドウを前に出す
+  Shift+Enter ファイルの場所 (フォルダ) を開く
+  ↑ ↓         選ぶ            Esc  閉じる
+  数式を打つと、答えを出す (Enter で答えをコピー)。
+"""
+import ast
+import operator
+import os
+import signal
+import subprocess
+import sys
+import threading
+import unicodedata
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+gi.require_version("GdkX11", "3.0")
+gi.require_version("Wnck", "3.0")
+from gi.repository import Gdk, GdkX11, Gio, GLib, Gtk, Pango, Wnck  # noqa: E402
+
+HOME = os.path.expanduser("~")
+FILE_ROOTS = ("/Applications/", "/home/Shared/", "/media/", "/mnt/")
+LIMITS = {"app": 5, "win": 4, "file": 8}
+HEADERS = {"app": "アプリケーション", "win": "ウィンドウ", "file": "ファイル", "calc": "計算"}
+
+CSS = b"""
+.spot { background-color: rgba(244,244,244,0.96); border: 1px solid rgba(0,0,0,0.45);
+        border-radius: 12px; padding: 14px; }
+.spot entry { font-size: 20px; min-height: 30px; padding: 4px 12px; border-radius: 7px;
+              background: #ffffff; color: #1e1e1e; border: 1px solid #8e8e8e; box-shadow: none; }
+.spot list, .spot row { background: transparent; color: #1e1e1e; }
+.spot row { padding: 4px 10px; border-radius: 6px; }
+.spot row:selected { background-image: linear-gradient(to bottom, #6fa8f2, #2a63c4); }
+.spot row:selected label { color: #ffffff; }
+.spot .head { font-size: 11px; font-weight: bold; color: #7a7a7a; padding: 6px 10px 2px 10px; }
+.spot .title { font-size: 15px; }
+.spot .sub { font-size: 11px; color: #7a7a7a; }
+.spot row:selected .sub { color: #dbe8fb; }
+"""
+
+
+# ---------------------------------------------------------------- 検索の部品
+
+def fold(s):
+    """大文字小文字・全角半角・カタカナ/ひらがなの違いを、同じにする。"""
+    s = unicodedata.normalize("NFKC", s).casefold()
+    return "".join(chr(ord(c) - 0x60) if "ァ" <= c <= "ヶ" else c for c in s)
+
+
+def score(q, text):
+    """小さいほどよく当たる。当たらなければ None。"""
+    i = text.find(q)
+    if i == 0:
+        return 0
+    if i > 0:
+        return 1 if text[i - 1] in " -_." else 2
+    if q.isascii() and len(q) >= 3:                  # 飛び飛びの一致 (fi → Firefox の f..i)
+        pos = -1
+        for ch in q:
+            pos = text.find(ch, pos + 1)
+            if pos < 0:
+                return None
+        return 4
+    return None
+
+
+_OPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv,
+        ast.Pow: operator.pow, ast.USub: operator.neg, ast.UAdd: operator.pos, ast.Mod: operator.mod}
+
+
+def calc(expr):
+    """四則演算だけを、安全に計算する。式でなければ None。"""
+    expr = unicodedata.normalize("NFKC", expr).replace("×", "*").replace("÷", "/").replace("^", "**")
+    if not any(c.isdigit() for c in expr) or not any(c in expr for c in "+-*/%") or \
+            any(c not in "0123456789+-*/%(). " for c in expr.replace("**", "*")):
+        return None
+
+    def ev(n):
+        if isinstance(n, ast.Expression):
+            return ev(n.body)
+        if isinstance(n, ast.Constant) and isinstance(n.value, (int, float)):
+            return n.value
+        if isinstance(n, ast.BinOp) and type(n.op) in _OPS:
+            a, b = ev(n.left), ev(n.right)
+            if isinstance(n.op, ast.Pow) and abs(b) > 100:
+                raise ValueError
+            return _OPS[type(n.op)](a, b)
+        if isinstance(n, ast.UnaryOp) and type(n.op) in _OPS:
+            return _OPS[type(n.op)](ev(n.operand))
+        raise ValueError
+    try:
+        v = ev(ast.parse(expr.strip(), mode="eval"))
+    except (ValueError, SyntaxError, ZeroDivisionError, OverflowError, RecursionError):
+        return None
+    return ("%.10g" % v) if isinstance(v, float) else str(v)
+
+
+def search_files(words):
+    """ホームは、その場で find して (索引の更新を待たない)、そのほかは plocate の索引を引く。"""
+    low = [w.casefold() for w in words]
+    found = []
+    try:
+        cmd = ["find", HOME, "-xdev", "(", "-name", ".*", "-prune", ")", "-o"]
+        for w in words:
+            esc = w.replace("\\", "\\\\").replace("*", "\\*").replace("?", "\\?").replace("[", "\\[")
+            cmd += ["-ipath", "*%s*" % esc]
+        cmd += ["-print"]
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=2.5, errors="replace").stdout
+        found += out.splitlines()
+    except subprocess.TimeoutExpired as e:
+        found += (e.stdout or b"").decode(errors="replace").splitlines() if isinstance(e.stdout, bytes) else []
+    try:
+        out = subprocess.run(["plocate", "-i", "-e", "-l", "2000", "--"] + words,
+                             capture_output=True, text=True, timeout=2, errors="replace").stdout
+        found += [p for p in out.splitlines() if p.startswith(FILE_ROOTS) and "/." not in p]
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+    seen, res = set(), []
+    for p in found:
+        if p == HOME or p in seen or "__pycache__" in p or not all(w in p.casefold() for w in low):
+            continue
+        seen.add(p)
+        res.append(p)
+    res.sort(key=lambda p: (not all(w in os.path.basename(p).casefold() for w in low), p.count("/"), p))
+    return res[:LIMITS["file"]]
+
+
+# ---------------------------------------------------------------- 画面
+
+class Launcher:
+    def __init__(self):
+        prov = Gtk.CssProvider()
+        prov.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), prov,
+                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.apps = []
+        self.gen = 0
+        self.timer = None
+        self.rows = []                 # 選べる行 [(行, 種類, 値)]
+        self.sel = -1
+        self.build_apps()
+        Gio.AppInfoMonitor.get().connect("changed", lambda *_: self.build_apps())
+        Wnck.set_client_type(Wnck.ClientType.PAGER)
+        self.screen = Wnck.Screen.get_default()
+
+        self.content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.content.get_style_context().add_class("spot")
+        self.entry = Gtk.Entry(placeholder_text="Spotlight")
+        self.entry.connect("changed", self.on_changed)
+        self.entry.connect("key-press-event", self.on_key)
+        self.entry.connect("activate", lambda *_: self.activate(False))
+        self.content.pack_start(self.entry, False, False, 0)
+        self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
+        self.sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vscrollbar_policy=Gtk.PolicyType.NEVER)
+        self.sw.add(self.list)
+        self.content.pack_start(self.sw, False, False, 0)
+
+        self.win = Gtk.Window(type=Gtk.WindowType.TOPLEVEL, title="Spotlight")
+        self.win.set_decorated(False)
+        self.win.set_skip_taskbar_hint(True)
+        self.win.set_skip_pager_hint(True)
+        self.win.set_keep_above(True)
+        self.win.set_default_size(640, -1)
+        self.win.set_resizable(False)
+        self.win.set_app_paintable(True)
+        vis = self.win.get_screen().get_rgba_visual()
+        if vis:
+            self.win.set_visual(vis)
+        self.win.add(self.content)
+        self.content.show_all()
+        self.win.connect("delete-event", lambda *_: self.hide() or True)
+        self.win.connect("focus-out-event", self.on_focus_out)
+        self.shown_at = 0
+
+    # --- アプリの一覧
+
+    def build_apps(self):
+        apps = []
+        for a in Gio.AppInfo.get_all():
+            if not a.should_show():
+                continue
+            name = a.get_display_name() or ""
+            kw = " ".join(getattr(a, "get_keywords", lambda: [])() or [])
+            exe = os.path.basename(a.get_executable() or "")
+            apps.append((name, fold(name), fold(kw + " " + exe + " " + (a.get_generic_name() or "")), a))
+        self.apps = apps
+
+    # --- 出し入れ
+
+    def toggle(self):
+        if self.win.get_visible():
+            self.hide()
+        else:
+            self.show()
+
+    def show(self):
+        self.entry.set_text("")
+        self.fill([])
+        disp = Gdk.Display.get_default()
+        seat = disp.get_default_seat()
+        mon = disp.get_monitor_at_point(*seat.get_pointer().get_position()[1:3])
+        g = mon.get_geometry()
+        self.win.show_all()
+        self.win.move(g.x + (g.width - 640) // 2, g.y + int(g.height * 0.15))
+        self.shown_at = GLib.get_monotonic_time()
+        self.win.present_with_time(GdkX11.x11_get_server_time(self.win.get_window()))
+        self.entry.grab_focus()
+
+    def hide(self):
+        self.win.hide()
+        self.gen += 1
+
+    def on_focus_out(self, *_):
+        if GLib.get_monotonic_time() - self.shown_at > 300000:      # 出した直後の揺れは、無視する
+            self.hide()
+        return False
+
+    # --- 検索
+
+    def on_changed(self, entry):
+        q = entry.get_text().strip()
+        self.gen += 1
+        gen = self.gen
+        if self.timer:
+            GLib.source_remove(self.timer)
+            self.timer = None
+        if not q:
+            self.fill([])
+            return
+        fq = fold(q)
+        items = []
+        c = calc(q)
+        if c is not None:
+            items.append(("calc", "= " + c, q, "accessories-calculator", c))
+        hits = []
+        for name, fname, fextra, a in self.apps:
+            s = score(fq, fname)
+            if s is None and fq in fextra:
+                s = 3
+            if s is not None:
+                hits.append((s, name.casefold(), name, a))
+        hits.sort(key=lambda h: h[:2])
+        for _, _, name, a in hits[:LIMITS["app"]]:
+            items.append(("app", name, a.get_generic_name() or "", a.get_icon(), a))
+        wins = []
+        for w in self.screen.get_windows():
+            if w.get_window_type() != Wnck.WindowType.NORMAL or w.is_skip_tasklist() or w.get_name() == "Spotlight":
+                continue
+            title, app = w.get_name() or "", w.get_application().get_name() if w.get_application() else ""
+            s = score(fq, fold(title + " " + app))
+            if s is not None:
+                wins.append((s, title, app, w))
+        wins.sort(key=lambda h: h[:2])
+        for _, title, app, w in wins[:LIMITS["win"]]:
+            items.append(("win", title, app, w.get_mini_icon(), w))
+        self.fill(items)
+        if len(q) >= 2:
+            self.timer = GLib.timeout_add(200, self.start_file_search, q, gen)
+
+    def start_file_search(self, q, gen):
+        self.timer = None
+        words = q.split()
+
+        def work():
+            res = search_files(words)
+            GLib.idle_add(self.add_files, res, gen)
+        threading.Thread(target=work, daemon=True).start()
+        return False
+
+    def add_files(self, paths, gen):
+        if gen != self.gen or not paths:
+            return False
+        items = list(self.items)
+        for p in paths:
+            d = os.path.dirname(p).replace(HOME, "~", 1)
+            if os.path.isdir(p):
+                icon = Gio.ThemedIcon.new("folder")
+            else:
+                icon = Gio.content_type_get_icon(Gio.content_type_guess(p, None)[0])
+            items.append(("file", os.path.basename(p), d, icon, p))
+        self.fill(items)
+        return False
+
+    # --- 一覧の描画
+
+    def fill(self, items):
+        self.items = items
+        for ch in self.list.get_children():
+            self.list.remove(ch)
+        self.rows = []
+        last = None
+        for it in items:
+            kind = it[0]
+            if kind != last:
+                h = Gtk.Label(label=HEADERS[kind], xalign=0)
+                h.get_style_context().add_class("head")
+                r = Gtk.ListBoxRow(selectable=False, activatable=False)
+                r.add(h)
+                self.list.add(r)
+                last = kind
+            _, title, sub, icon, val = it
+            box = Gtk.Box(spacing=12)
+            if isinstance(icon, str):
+                img = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.DND)
+            elif isinstance(icon, Gio.Icon):
+                img = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.DND)
+            elif icon is not None:
+                img = Gtk.Image.new_from_pixbuf(icon)
+            else:
+                img = Gtk.Image.new_from_icon_name("application-x-executable", Gtk.IconSize.DND)
+            img.set_pixel_size(32)
+            box.pack_start(img, False, False, 0)
+            col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            t = Gtk.Label(label=title, xalign=0, ellipsize=Pango.EllipsizeMode.END)
+            t.get_style_context().add_class("title")
+            col.pack_start(t, False, False, 0)
+            if sub:
+                s = Gtk.Label(label=sub, xalign=0, ellipsize=Pango.EllipsizeMode.MIDDLE)
+                s.get_style_context().add_class("sub")
+                col.pack_start(s, False, False, 0)
+            box.pack_start(col, True, True, 0)
+            r = Gtk.ListBoxRow()
+            r.add(box)
+            self.list.add(r)
+            self.rows.append((r, kind, val))
+        self.list.show_all()
+        n = len(self.rows)
+        self.sw.set_visible(n > 0)
+        self.sw.set_min_content_height(min(len(self.list.get_children()), 10) * 46 if n else 0)
+        self.sw.set_vexpand(False)
+        self.select(0 if n else -1)
+        self.win.resize(640, 1)
+
+    def select(self, i):
+        self.sel = i
+        if i < 0:
+            self.list.unselect_all()
+            return
+        r = self.rows[i][0]
+        self.list.select_row(r)
+        adj = self.sw.get_vadjustment()
+        alloc = r.get_allocation()
+        if alloc.y + alloc.height > adj.get_value() + adj.get_page_size():
+            adj.set_value(alloc.y + alloc.height - adj.get_page_size())
+        elif alloc.y < adj.get_value():
+            adj.set_value(alloc.y)
+
+    def on_key(self, _w, ev):
+        k = ev.keyval
+        if k == Gdk.KEY_Escape:
+            self.hide()
+        elif k in (Gdk.KEY_Down, Gdk.KEY_Tab) and self.rows:
+            self.select((self.sel + 1) % len(self.rows))
+        elif k in (Gdk.KEY_Up, Gdk.KEY_ISO_Left_Tab) and self.rows:
+            self.select((self.sel - 1) % len(self.rows))
+        elif k in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and ev.state & Gdk.ModifierType.SHIFT_MASK:
+            self.activate(True)
+        else:
+            return False
+        return True
+
+    # --- 実行
+
+    def activate(self, folder):
+        if self.sel < 0:
+            return
+        _, kind, val = self.rows[self.sel]
+        self.hide()
+        if kind == "app":
+            val.launch([], Gdk.Display.get_default().get_app_launch_context())
+        elif kind == "win":
+            val.activate(GdkX11.x11_get_server_time(self.win.get_window()) if self.win.get_window() else 0)
+        elif kind == "file":
+            target = os.path.dirname(val) if folder else val
+            Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(target).get_uri(), None)
+        elif kind == "calc":
+            Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(val, -1)
+            Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).store()
+
+
+def main():
+    if "--screenshot" in sys.argv:
+        return screenshot(sys.argv[sys.argv.index("--screenshot") + 1], sys.argv[sys.argv.index("--screenshot") + 2:])
+    lock = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "snowlinux-spotlightd.pid")
+    L = Launcher()
+    with open(lock, "w") as f:
+        f.write(str(os.getpid()))
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, lambda: (L.toggle(), True)[1])
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: Gtk.main_quit())
+    if "--show" in sys.argv:
+        GLib.idle_add(L.show)
+    Gtk.main()
+
+
+def screenshot(path, queries):
+    """見た目の確認用: 窓を出さずに、一覧だけを画像にする。"""
+    L = Launcher()
+    off = Gtk.OffscreenWindow()
+    L.win.remove(L.content)
+    off.add(L.content)
+    off.set_default_size(640, 100)
+    off.show_all()
+    from PIL import Image
+    import io
+    frames = []
+    for q in queries:
+        L.entry.set_text(q)
+        import time
+        end = time.time() + 1.5
+        while time.time() < end:
+            Gtk.main_iteration_do(False)
+        off.resize(640, 1)
+        end = time.time() + 0.3
+        while time.time() < end:
+            Gtk.main_iteration_do(False)
+        pb = off.get_pixbuf()
+        ok, data = pb.save_to_bufferv("png", [], [])
+        frames.append(Image.open(io.BytesIO(data)))
+    sheet = Image.new("RGB", (sum(f.width for f in frames), max(f.height for f in frames)), (120, 140, 170))
+    x = 0
+    for f in frames:
+        sheet.paste(f, (x, 0))
+        x += f.width
+    sheet.save(path)
+
+
+if __name__ == "__main__":
+    main()
