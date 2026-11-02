@@ -49,6 +49,8 @@
       <property name="&lt;Super&gt;e" type="string" value="thunar" />
       <property name="&lt;Primary&gt;&lt;Shift&gt;m" type="string" value="magnus" />
       <property name="&lt;Primary&gt;space" type="string" value="snowlinux-spotlight" />
+      <property name="F9" type="string" value="skippy-xd --expose" />
+      <property name="F8" type="string" value="skippy-xd --paging" />
     </property>
   </property>
   <property name="xfwm4" type="empty">

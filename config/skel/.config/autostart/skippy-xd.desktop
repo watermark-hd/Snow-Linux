@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Expose (skippy-xd daemon)
+Exec=skippy-xd --start-daemon
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
