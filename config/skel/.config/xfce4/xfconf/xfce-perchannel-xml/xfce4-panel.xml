@@ -23,6 +23,7 @@
         <value type="int" value="5"/>
         <value type="int" value="6"/>
         <value type="int" value="7"/>
+        <value type="int" value="8"/>
       </property>
     </property>
   </property>
@@ -54,7 +55,13 @@
     <property name="plugin-7" type="string" value="clock">
       <property name="mode" type="uint" value="2"/>
       <property name="digital-layout" type="uint" value="1"/>
-      <property name="digital-time-format" type="string" value="%a %H:%M"/>
+      <property name="digital-time-format" type="string" value="%-m月%-d日(%a) %H:%M"/>
+    </property>
+    <property name="plugin-8" type="string" value="launcher">
+      <property name="items" type="array">
+        <value type="string" value="snowlinux-spotlight.desktop"/>
+      </property>
+      <property name="disable-tooltips" type="bool" value="true"/>
     </property>
   </property>
 </channel>

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=検索
+Comment=Ctrl+Space
+Exec=snowlinux-spotlight
+Icon=system-search
+Terminal=false
+StartupNotify=false

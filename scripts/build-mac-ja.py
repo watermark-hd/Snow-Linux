@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""デスクトップの右クリックメニューの文言を Mac 風にした xfdesktop.mo を作る。
+"""Xfce のアプリの日本語の訳を、Mac 風の文言に差し替えた .mo を作る。
 
-Xfce のデスクトップのメニューは、項目の追加や並べ替えができないので、日本語の訳を差し替えて Mac に寄せる。
-使い方: build-xfdesktop-ja.py 出力先.mo [--from 元の.mo]   (元は、初めはシステムの ja の xfdesktop.mo)"""
+Xfce のデスクトップのメニューや Thunar の項目は、追加や並べ替えができないので、訳を差し替えて Mac に寄せる。
+使い方: build-mac-ja.py ドメイン(xfdesktop / thunar) 出力先.mo [--from 元の.mo]
+        元は、初めはシステムの ja の .mo。"""
 import gettext
 import struct
 import sys
 
-SRC = "/usr/share/locale/ja/LC_MESSAGES/xfdesktop.mo"
+SRC = "/usr/share/locale/ja/LC_MESSAGES/%s.mo"
 
-MAC = {
+XFDESKTOP = {
     "Create _Folder...": "新規フォルダ(_F)",
     "Create _Folder": "新規フォルダ(_F)",
     "Create _Document": "新規書類(_D)",
@@ -28,6 +29,32 @@ MAC = {
     "_Empty File": "空のファイル(_E)",
     "New Folder": "名称未設定フォルダ",
 }
+
+THUNAR = {
+    "Properties": "情報を見る",
+    "_Properties...": "情報を見る(_I)",
+    "%s - Properties": "%s の情報",
+    "%s (%s) - Properties": "%s (%s) の情報",
+    "Mo_ve to Trash": "ゴミ箱に入れる(_T)",
+    "Move to Trash": "ゴミ箱に入れる",
+    "_Paste": "ペースト(_P)",
+    "_Paste Into Folder": "フォルダにペースト(_P)",
+    "Create _Folder...": "新規フォルダ(_F)...",
+    "Create Folder": "新規フォルダ",
+    "New Folder": "名称未設定フォルダ",
+    "_Open Location...": "フォルダへ移動(_G)...",
+    "Open _Parent": "上のフォルダを開く(_P)",
+    "_Icon View": "アイコンで表示(_I)",
+    "_Compact View": "リストで表示(_L)",
+    "Places": "よく使う項目",
+    "Devices": "デバイス",
+    "Network": "ネットワーク",
+    "Computer": "コンピュータ",
+    "_Computer": "コンピュータ(_C)",
+    "Folder": "フォルダ",
+}
+
+TABLES = {"xfdesktop": XFDESKTOP, "thunar": THUNAR}
 
 
 def write_mo(catalog, path):
@@ -51,11 +78,12 @@ def write_mo(catalog, path):
 
 
 def main():
-    src = sys.argv[sys.argv.index("--from") + 1] if "--from" in sys.argv else SRC
+    domain, out = sys.argv[1], sys.argv[2]
+    src = sys.argv[sys.argv.index("--from") + 1] if "--from" in sys.argv else SRC % domain
     t = gettext.GNUTranslations(open(src, "rb"))
     cat = {k: v for k, v in t._catalog.items() if isinstance(k, str)}
-    cat.update(MAC)
-    write_mo(cat, sys.argv[1])
+    cat.update(TABLES[domain])
+    write_mo(cat, out)
 
 
 main()

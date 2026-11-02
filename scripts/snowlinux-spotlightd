@@ -427,7 +427,7 @@ class Launcher:
         def sep():
             m.append(Gtk.SeparatorMenuItem())
 
-        add("このコンピュータについて", lambda *_: self.run("quick-system-info-mx"))
+        add("このコンピュータについて", lambda *_: self.run("snowlinux-about"))
         add("ソフトウェア・アップデート…", lambda *_: self.run("mx-updater"))
         sep()
         add("システム環境設定…", lambda *_: self.run("snowlinux-system-preferences"))

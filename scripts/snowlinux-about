@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""このコンピュータについて (Mac の「このMacについて」)。SnowLinux の版と、機械の概要を小さな窓で見せる。"""
+import os
+import platform
+import shutil
+import subprocess
+import sys
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk
+
+VERSION = "0.1 (開発中)"
+
+
+def os_release():
+    info = {}
+    try:
+        for line in open("/etc/os-release", encoding="utf-8"):
+            if "=" in line:
+                k, v = line.rstrip().split("=", 1)
+                info[k] = v.strip('"')
+    except OSError:
+        pass
+    return info
+
+
+def mx_name():
+    try:
+        for line in open("/etc/lsb-release", encoding="utf-8"):
+            if line.startswith("DISTRIB_DESCRIPTION"):
+                return line.split("=", 1)[1].strip().strip('"')
+    except OSError:
+        pass
+    return ""
+
+
+def cpu():
+    try:
+        for line in open("/proc/cpuinfo", encoding="utf-8"):
+            if line.startswith("model name"):
+                return " ".join(line.split(":", 1)[1].split())
+    except OSError:
+        pass
+    return platform.processor() or platform.machine()
+
+
+def memory():
+    try:
+        for line in open("/proc/meminfo", encoding="utf-8"):
+            if line.startswith("MemTotal"):
+                gb = int(line.split()[1]) / 1024 / 1024
+                return f"{gb:.1f} GB"
+    except OSError:
+        pass
+    return "不明"
+
+
+def disk():
+    u = shutil.disk_usage("/")
+    dev = ""
+    try:
+        dev = subprocess.run(["findmnt", "-no", "SOURCE", "/"], capture_output=True, text=True).stdout.strip()
+    except OSError:
+        pass
+    return f"{dev}  ({u.total / 1e9:.0f} GB のうち {u.free / 1e9:.0f} GB が空き)"
+
+
+def main():
+    rel = os_release()
+    win = Gtk.Window(title="このコンピュータについて", resizable=False)
+    win.set_position(Gtk.WindowPosition.CENTER)
+    win.set_border_width(0)
+    win.connect("destroy", Gtk.main_quit)
+    win.connect("key-press-event", lambda _w, e: win.destroy() if e.keyval == 0xff1b else False)
+
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+    box.set_border_width(28)
+    box.set_size_request(380, -1)
+    img = Gtk.Image.new_from_icon_name("snowlinux-logo-color", Gtk.IconSize.DIALOG)
+    img.set_pixel_size(96)
+    box.pack_start(img, False, False, 6)
+    title = Gtk.Label()
+    title.set_markup("<span size='xx-large' weight='bold'>SnowLinux</span>")
+    box.pack_start(title, False, False, 0)
+    ver = Gtk.Label(label=f"バージョン {VERSION}")
+    box.pack_start(ver, False, False, 0)
+    base = Gtk.Label(label=f"{mx_name() or rel.get('PRETTY_NAME', 'Linux')} をもとにしています")
+    base.get_style_context().add_class("dim-label")
+    box.pack_start(base, False, False, 0)
+
+    grid = Gtk.Grid(column_spacing=12, row_spacing=6, halign=Gtk.Align.CENTER)
+    grid.set_margin_top(16)
+    rows = [("プロセッサ", cpu()), ("メモリ", memory()), ("起動ディスク", disk()),
+            ("カーネル", platform.release()), ("コンピュータ名", platform.node())]
+    for i, (k, v) in enumerate(rows):
+        a = Gtk.Label(label=k, xalign=1)
+        a.get_style_context().add_class("dim-label")
+        b = Gtk.Label(label=v, xalign=0, selectable=True, wrap=True, max_width_chars=34)
+        grid.attach(a, 0, i, 1, 1)
+        grid.attach(b, 1, i, 1, 1)
+    box.pack_start(grid, False, False, 0)
+
+    btn = Gtk.Button(label="詳細情報...")
+    btn.set_halign(Gtk.Align.CENTER)
+    btn.set_margin_top(18)
+    btn.connect("clicked", lambda *_: subprocess.Popen(["quick-system-info-mx"]))
+    box.pack_start(btn, False, False, 0)
+
+    win.add(box)
+    btn.grab_focus()
+    win.show_all()
+    if "--screenshot" in sys.argv:
+        from gi.repository import GLib
+        path = sys.argv[sys.argv.index("--screenshot") + 1]
+
+        def shot():
+            from PIL import ImageGrab
+            x, y = win.get_position()
+            w, h = win.get_size()
+            ImageGrab.grab(bbox=(x, y, x + w, y + h)).save(path)
+            Gtk.main_quit()
+        GLib.timeout_add(800, shot)
+    Gtk.main()
+
+
+main()
