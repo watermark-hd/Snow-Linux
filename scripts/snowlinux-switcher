@@ -1,0 +1,13 @@
+#!/bin/sh
+# アプリの切り替え (Mac の ⌘Tab / ⌘`)。Alt+Tab / Alt+` で呼ぶ。
+#   snowlinux-switcher apps [back]      アプリを切り替える (Alt+Tab、戻るは Alt+Shift+Tab)
+#   snowlinux-switcher windows [back]   同じアプリのウィンドウを切り替える (Alt+`)
+# 描くのは、待機中の snowlinux-spotlightd。合図 (RTMIN+1〜4) を送るだけ。待機していなければ、何もしない。
+case "$1$2" in
+    apps)        sig=RTMIN+1 ;;
+    appsback)    sig=RTMIN+2 ;;
+    windows)     sig=RTMIN+3 ;;
+    windowsback) sig=RTMIN+4 ;;
+    *) exit 1 ;;
+esac
+exec pkill "-$sig" -u "$(id -u)" -f 'snowlinux-spotlightd'

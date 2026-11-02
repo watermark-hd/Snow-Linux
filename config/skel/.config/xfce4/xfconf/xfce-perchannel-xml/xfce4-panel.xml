@@ -27,10 +27,12 @@
     </property>
   </property>
   <property name="plugins" type="empty">
-    <!-- 左端のメニュー (自作プラグインができるまでの仮) -->
-    <property name="plugin-1" type="string" value="applicationsmenu">
-      <property name="show-button-title" type="bool" value="false"/>
-      <property name="button-icon" type="string" value="snowlinux-logo"/>
+    <!-- 左端のロゴ: 押すと、ロゴのメニュー (Mac のアップルメニュー)。メニューは待機中の snowlinux-spotlightd が出す -->
+    <property name="plugin-1" type="string" value="launcher">
+      <property name="items" type="array">
+        <value type="string" value="snowlinux-menu.desktop"/>
+      </property>
+      <property name="disable-tooltips" type="bool" value="true"/>
     </property>
     <!-- アプリ名とメニュー (グローバルメニュー) -->
     <property name="plugin-2" type="string" value="appmenu">

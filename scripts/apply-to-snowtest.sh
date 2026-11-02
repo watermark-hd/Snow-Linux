@@ -66,6 +66,9 @@ install -D -m 644 "$root/config/system/applications/snowlinux-system-preferences
 install -m 755 "$root/scripts/snowlinux-spotlight" /usr/local/bin/snowlinux-spotlight
 install -m 755 "$root/scripts/snowlinux-spotlightd" /usr/local/bin/snowlinux-spotlightd
 rm -f /usr/local/bin/snowlinux-file-search          # rofi 版の残り (廃止)
+install -m 755 "$root/scripts/snowlinux-screenshot" /usr/local/bin/snowlinux-screenshot
+install -m 755 "$root/scripts/snowlinux-appmenu" /usr/local/bin/snowlinux-appmenu
+install -m 755 "$root/scripts/snowlinux-switcher" /usr/local/bin/snowlinux-switcher
 install -m 755 "$root/scripts/snowlinux-display-calibrator" /usr/local/bin/snowlinux-display-calibrator
 install -D -m 644 "$root/config/system/applications/snowlinux-display-calibrator.desktop" /usr/local/share/applications/snowlinux-display-calibrator.desktop
 

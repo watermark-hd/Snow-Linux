@@ -1,0 +1,38 @@
+#!/bin/sh
+# SnowLinux のスクリーンショット。Mac と同じ操作で使う。
+#   snowlinux-screenshot full               画面全体を撮って、デスクトップに保存する (Ctrl+Shift+3)
+#   snowlinux-screenshot select             範囲をドラッグ、またはウィンドウをクリックして撮る (Ctrl+Shift+4)
+#   snowlinux-screenshot full clipboard     保存せず、クリップボードに入れる (Ctrl+Alt+Shift+3)
+#   snowlinux-screenshot select clipboard   同上 (Ctrl+Alt+Shift+4)
+# Esc で取りやめ。保存先は SNOW_SHOT_DIR で変えられる。SNOW_SHOT_QUIET=1 で、音と通知を出さない。
+mode=${1:-full}
+dest=${2:-file}
+dir=${SNOW_SHOT_DIR:-$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME")}
+case "$LANG" in
+    ja*) label="スクリーンショット" ;;
+    *)   label="Screenshot" ;;
+esac
+name="$label $(date '+%Y-%m-%d %H.%M.%S').png"
+if [ "$dest" = clipboard ]; then
+    file=$(mktemp --suffix=.png)
+else
+    file="$dir/$name"
+fi
+
+case "$mode" in
+    select) scrot -s -b -f -l style=solid,width=1,color=white -o -F "$file" || { rm -f "$file"; exit 0; } ;;
+    *)      scrot -o -F "$file" || exit 1 ;;
+esac
+
+if [ "$dest" = clipboard ]; then
+    xclip -selection clipboard -t image/png -i "$file"
+    rm -f "$file"
+    msg="クリップボードにコピーしました"; icon=edit-copy
+else
+    msg="$name"; icon=$file
+fi
+
+if [ -z "$SNOW_SHOT_QUIET" ]; then
+    paplay /usr/share/sounds/freedesktop/stereo/camera-shutter.oga 2>/dev/null &
+    notify-send -i "$icon" -t 3000 "スクリーンショット" "$msg" 2>/dev/null
+fi

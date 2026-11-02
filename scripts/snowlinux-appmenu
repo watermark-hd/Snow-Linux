@@ -1,0 +1,13 @@
+#!/bin/sh
+# 上のバーのロゴのメニュー (Mac のアップルメニュー) と、強制終了の窓を出す。
+#   snowlinux-appmenu menu         ロゴのメニュー (パネルのロゴを押したとき)
+#   snowlinux-appmenu force-quit   強制終了 (Ctrl+Alt+Esc)
+# 描くのは、待機中の snowlinux-spotlightd。合図を送るだけ。待機していなければ、起動して出す。
+case "$1" in
+    force-quit) sig=-RTMIN; arg=--force-quit ;;
+    *)          sig=-USR2;  arg=--menu ;;
+esac
+if pkill "$sig" -u "$(id -u)" -f 'snowlinux-spotlightd'; then
+    exit 0
+fi
+exec snowlinux-spotlightd "$arg"
