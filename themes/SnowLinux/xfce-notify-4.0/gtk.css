@@ -1,0 +1,15 @@
+/* 通知: Mac (Growl や 10.8 以降の通知) のような、暗い半透明の角丸。右上に出る */
+#XfceNotifyWindow {
+    background-color: rgba(40, 40, 40, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 10px;
+    color: #f2f2f2;
+}
+#XfceNotifyWindow:hover { background-color: rgba(58, 58, 58, 0.95); }
+#XfceNotifyWindow label { color: #e8e8e8; }
+#XfceNotifyWindow label#summary { color: #ffffff; font-weight: bold; }
+#XfceNotifyWindow button { background-image: none; background-color: rgba(255,255,255,0.12);
+                           border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #ffffff; box-shadow: none; text-shadow: none; }
+#XfceNotifyWindow button:hover { background-color: rgba(255,255,255,0.22); }
+#XfceNotifyWindow progressbar trough { background-color: rgba(255,255,255,0.2); border-radius: 4px; min-height: 6px; }
+#XfceNotifyWindow progressbar progress { background-color: #ffffff; border-radius: 4px; min-height: 6px; }

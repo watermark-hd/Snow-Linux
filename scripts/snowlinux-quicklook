@@ -1,0 +1,5 @@
+#!/bin/sh
+# クイックルック (Mac のスペース)。Thunar で選んだファイルを、待機中の snowlinux-spotlightd に見せてもらう。
+#   snowlinux-quicklook ファイル...   開く (もう一度呼ぶと閉じる)。複数を渡すと、並べて見せる
+[ -n "$1" ] && printf '%s\n' "$@" > "${XDG_RUNTIME_DIR:-/tmp}/snowlinux-quicklook"
+exec pkill -RTMIN+5 -u "$(id -u)" -f 'snowlinux-spotlightd'

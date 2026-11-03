@@ -35,6 +35,9 @@ mkdir -p "/home/$user/.themes"
 for t in "$themes"/*/; do
     [ -d "$t" ] && cp -a --no-preserve=ownership "$t" "/home/$user/.themes/"
 done
+# 通知デーモンは ~/.themes を見ないことがあるので、XDG の場所にも置く
+mkdir -p "/home/$user/.local/share/themes"
+cp -a --no-preserve=ownership "$themes/SnowLinux" "/home/$user/.local/share/themes/"
 
 # アイコンテーマとロゴ (実際のインストールでは /usr/share/icons に入れる)
 mkdir -p "/home/$user/.local/share/icons/hicolor/scalable/apps"
@@ -70,6 +73,7 @@ install -m 755 "$root/scripts/snowlinux-screenshot" /usr/local/bin/snowlinux-scr
 install -m 755 "$root/scripts/snowlinux-appmenu" /usr/local/bin/snowlinux-appmenu
 install -m 755 "$root/scripts/snowlinux-switcher" /usr/local/bin/snowlinux-switcher
 install -m 755 "$root/scripts/snowlinux-about" /usr/local/bin/snowlinux-about
+install -m 755 "$root/scripts/snowlinux-quicklook" /usr/local/bin/snowlinux-quicklook
 install -m 755 "$root/scripts/snowlinux-display-calibrator" /usr/local/bin/snowlinux-display-calibrator
 install -D -m 644 "$root/config/system/applications/snowlinux-display-calibrator.desktop" /usr/local/share/applications/snowlinux-display-calibrator.desktop
 

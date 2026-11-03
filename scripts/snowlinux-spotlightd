@@ -58,6 +58,11 @@ CSS = b"""
 .switcher .slot { padding: 10px; border-radius: 12px; border: 1px solid transparent; }
 .switcher .slot.sel { background-color: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.5); }
 .switcher label { color: #ffffff; font-size: 16px; }
+.ql { background-color: rgba(38,38,38,0.94); border: 1px solid rgba(255,255,255,0.28); border-radius: 12px; }
+.ql .title { color: #e6e6e6; font-size: 13px; padding: 8px 14px; }
+.ql .meta { color: #b8b8b8; font-size: 13px; }
+.ql .big { color: #ffffff; font-size: 18px; }
+.ql textview, .ql textview text { background-color: #1e1e1e; color: #e6e6e6; }
 """
 
 
@@ -731,6 +736,333 @@ class Switcher:
         return False
 
 
+class QuickLook:
+    """Mac 風のクイックルック: ファイルを選んでスペースを押すと、中身をすぐ見せる。もう一度スペースか Esc で閉じる。
+
+    開くファイルの名前は、snowlinux-quicklook が $XDG_RUNTIME_DIR/snowlinux-quicklook に書いてから合図を送る。"""
+
+    def __init__(self):
+        self.win = None                        # 窓は一度だけ作り、閉じたら隠す (開くたびに作り直すと遅い)
+        self.prev = ""                         # 開いたときに前面にあった窓 (Thunar)。閉じるとき、そこへ戻す
+        self.path = ""
+        self.sb = None
+        self.focusable = True
+        self.start = None                      # 開いたときのファイル (矢印でたどった分を、Thunar に伝えるため)
+
+    def toggle(self):
+        if self.win is not None and self.win.get_visible():
+            self.close()
+            return
+        try:
+            with open(os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "snowlinux-quicklook"),
+                      encoding="utf-8") as f:
+                paths = [p for p in f.read().split("\n") if p and os.path.exists(p)]
+        except OSError:
+            return
+        if not paths:
+            return
+        try:
+            self.prev = subprocess.run(["xdotool", "getactivewindow"], capture_output=True, text=True,
+                                       timeout=1).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            self.prev = ""
+        self.start = None
+        self.sb = None
+        # 1 つだけなら、キーボードは取らず、Thunar のステータスバーを見て選択に追従する (見つからなければ自前でたどる)。
+        # 複数なら、並べて見せるだけ
+        self.focusable = len(paths) > 1
+        if len(paths) == 1:
+            self.show(paths[0])
+            GLib.idle_add(self.begin_follow)
+        else:
+            self.show_many(paths)
+
+    def close(self):
+        if not self.win:
+            return
+        self.win.hide()
+        if not self.prev or not self.focusable:
+            return
+        # 隠すだけでは、キーボードの受け取り先がどこにも戻らないことがある。開く前に前面にあった窓へ戻し、
+        # たどった分だけ Thunar の選択も動かす (Thunar に選択を頼む方法がないので、同じ数だけ矢印を送る)
+        cmd = ["xdotool", "windowactivate", "--sync", self.prev]
+        moved = self.moved_by()
+        if moved:
+            key = self.arrow_for(moved > 0)
+            cmd += ["key", "--delay", "8", "--repeat", str(abs(moved)), key]
+        subprocess.Popen(cmd, stderr=subprocess.DEVNULL)
+
+    def moved_by(self):
+        if self.start is None or not self.path:
+            return 0
+        items = self.siblings()
+        if self.start in items and self.path in items:
+            return items.index(self.path) - items.index(self.start)
+        return 0
+
+    @staticmethod
+    def arrow_for(forward):
+        """Thunar の表示の形で、1 つ進める矢印が違う (アイコン表示は左右、リストとコンパクトは上下)。"""
+        try:
+            view = subprocess.run(["xfconf-query", "-c", "thunar", "-p", "/last-view"], capture_output=True,
+                                  text=True, timeout=2).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            view = ""
+        if "Icon" in view or not view:
+            return "Right" if forward else "Left"
+        return "Down" if forward else "Up"
+
+    def siblings(self):
+        """同じフォルダのファイルを、Thunar の既定に近い順 (フォルダが先、名前順、隠しファイルなし) に並べる。"""
+        d = os.path.dirname(self.path)
+        try:
+            names = [n for n in os.listdir(d) if not n.startswith(".")]
+        except OSError:
+            return [self.path]
+        names.sort(key=lambda n: (not os.path.isdir(os.path.join(d, n)), n.casefold()))
+        return [os.path.join(d, n) for n in names]
+
+    def step(self, delta):
+        if not self.path:                       # 複数を並べているときは、たどらない
+            return
+        items = self.siblings()
+        if self.path in items:
+            self.show(items[(items.index(self.path) + delta) % len(items)])
+
+    def build_window(self):
+        win = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
+        win.set_type_hint(Gdk.WindowTypeHint.DIALOG)
+        win.set_keep_above(True)
+        win.set_skip_taskbar_hint(True)
+        win.set_app_paintable(True)
+        win.get_style_context().add_class("ql")
+        screen = Gdk.Screen.get_default()
+        if screen.get_rgba_visual():
+            win.set_visual(screen.get_rgba_visual())
+        win.connect("key-press-event", self.on_key)
+        win.connect("delete-event", lambda *_: (self.close(), True)[1])
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.title = Gtk.Label(ellipsize=Pango.EllipsizeMode.MIDDLE, max_width_chars=60)
+        self.title.get_style_context().add_class("title")
+        box.pack_start(self.title, False, False, 0)
+        self.holder = Gtk.Box()
+        box.pack_start(self.holder, True, True, 0)
+        win.add(box)
+        box.show_all()
+        return win
+
+    def show(self, path):
+        if self.win is None:
+            self.win = self.build_window()
+        geo = Gdk.Display.get_default().get_primary_monitor().get_geometry()
+        for child in self.holder.get_children():
+            self.holder.remove(child)
+        self.path = path
+        if self.start is None:
+            self.start = path
+        items = self.siblings()
+        pos = f"  ({items.index(path) + 1} / {len(items)})" if path in items and len(items) > 1 else ""
+        self.win.set_title(os.path.basename(path))
+        self.title.set_text(os.path.basename(path) + pos)
+        content = self.content(path, int(geo.width * 0.7), int(geo.height * 0.7))
+        self.holder.pack_start(content, True, True, 0)
+        content.show_all()
+        req = self.win.get_preferred_size()[1]
+        self.win.resize(req.width, req.height)
+        self.win.move(geo.x + (geo.width - req.width) // 2, geo.y + (geo.height - req.height) // 2)
+        self.win.set_accept_focus(self.focusable)
+        self.win.show()
+        if self.focusable:
+            self.win.present()
+
+    def begin_follow(self):
+        """前面の Thunar のステータスバーを探して、見つかれば選択を追いかける。見つからなければ、自前の矢印でたどる形に戻す。"""
+        self.sb = self.find_status_bar()
+        if self.sb is not None:
+            GLib.timeout_add(150, self.poll_follow)
+        elif self.win is not None and self.win.get_visible():
+            self.focusable = True
+            self.win.hide()
+            self.win.set_accept_focus(True)
+            self.win.show()
+            self.win.present()
+        return False
+
+    @staticmethod
+    def find_status_bar():
+        try:
+            gi.require_version("Atspi", "2.0")
+            from gi.repository import Atspi
+            desk = Atspi.get_desktop(0)
+            for i in range(desk.get_child_count()):
+                app = desk.get_child_at_index(i)
+                if not app or app.get_name() != "Thunar":
+                    continue
+                for j in range(app.get_child_count()):
+                    frame = app.get_child_at_index(j)
+                    if frame and frame.get_state_set().contains(Atspi.StateType.ACTIVE):
+                        return QuickLook.walk_for_status(frame, 0)
+        except Exception as e:
+            print("quicklook: AT-SPI:", e, file=sys.stderr)
+        return None
+
+    @staticmethod
+    def walk_for_status(node, depth):
+        if depth > 8:
+            return None
+        if node.get_role_name() == "status bar":
+            return node
+        for k in range(node.get_child_count()):
+            c = node.get_child_at_index(k)
+            if c and c.get_role_name() not in ("menu bar", "tool bar", "scroll pane", "table", "menu"):
+                r = QuickLook.walk_for_status(c, depth + 1)
+                if r is not None:
+                    return r
+        return None
+
+    def poll_follow(self):
+        if self.win is None or not self.win.get_visible() or self.focusable:
+            return False
+        active = Wnck.Screen.get_default().get_active_window()
+        if self.prev and active is not None and str(active.get_xid()) != self.prev:
+            self.close()                        # ほかの窓に移ったら、閉じる
+            return False
+        try:
+            text = self.sb.get_name()
+        except Exception:
+            self.close()
+            return False
+        if text.startswith('"') and '"  |' in text:   # 1 つだけ選んでいるとき: "ファイル名"  |  サイズ  |  種類
+            name = text[1:text.index('"  |')]
+            path = os.path.join(os.path.dirname(self.path), name)
+            if path != self.path and os.path.exists(path):
+                self.show(path)
+        return True
+
+    def show_many(self, paths):
+        """複数を選んだときは、並べて見せる (2 枚の画像の見比べなど)。矢印でのたどりは、しない。"""
+        if self.win is None:
+            self.win = self.build_window()
+        geo = Gdk.Display.get_default().get_primary_monitor().get_geometry()
+        for child in self.holder.get_children():
+            self.holder.remove(child)
+        self.path = ""
+        shown = paths[:4]
+        row = Gtk.Box(spacing=8)
+        row.set_border_width(8)
+        cell_w = int(geo.width * 0.88 / len(shown))
+        for p in shown:
+            col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            name = Gtk.Label(label=os.path.basename(p), ellipsize=Pango.EllipsizeMode.MIDDLE, max_width_chars=30)
+            name.get_style_context().add_class("meta")
+            col.pack_start(name, False, False, 0)
+            col.pack_start(self.content(p, cell_w, int(geo.height * 0.7)), True, True, 0)
+            row.pack_start(col, True, True, 0)
+        more = f"  (ほか {len(paths) - 4} 項目)" if len(paths) > 4 else ""
+        self.title.set_text(f"{len(paths)} 項目{more}")
+        self.win.set_title(f"{len(paths)} 項目")
+        self.holder.pack_start(row, True, True, 0)
+        row.show_all()
+        req = self.win.get_preferred_size()[1]
+        self.win.resize(req.width, req.height)
+        self.win.move(geo.x + (geo.width - req.width) // 2, geo.y + (geo.height - req.height) // 2)
+        self.win.show()
+        self.win.present()
+
+    def on_key(self, _w, ev):
+        if ev.keyval in (Gdk.KEY_space, Gdk.KEY_Escape, Gdk.KEY_q, Gdk.KEY_Return):
+            self.close()
+        elif ev.keyval in (Gdk.KEY_Left, Gdk.KEY_Up):
+            self.step(-1)                       # 同じフォルダの、前のファイル
+        elif ev.keyval in (Gdk.KEY_Right, Gdk.KEY_Down):
+            self.step(1)
+        return True
+
+    def info_box(self, path, icon=None):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_border_width(32)
+        box.set_size_request(360, -1)
+        finfo = Gio.File.new_for_path(path).query_info("standard::*,time::modified", 0, None)
+        img = Gtk.Image.new_from_gicon(icon or finfo.get_icon(), Gtk.IconSize.DIALOG)
+        img.set_pixel_size(128)
+        box.pack_start(img, False, False, 8)
+        name = Gtk.Label(label=os.path.basename(path), wrap=True, max_width_chars=36)
+        name.get_style_context().add_class("big")
+        box.pack_start(name, False, False, 0)
+        if os.path.isdir(path):
+            try:
+                kind = f"フォルダ ({len(os.listdir(path))} 項目)"
+            except OSError:
+                kind = "フォルダ"
+        else:
+            kind = f"{Gio.content_type_get_description(finfo.get_content_type())} - {GLib.format_size(finfo.get_size())}"
+        when = finfo.get_modification_date_time()
+        for line in (kind, "変更日: " + when.to_local().format("%Y年%-m月%-d日 %H:%M") if when else ""):
+            if line:
+                lab = Gtk.Label(label=line)
+                lab.get_style_context().add_class("meta")
+                box.pack_start(lab, False, False, 0)
+        return box
+
+    def content(self, path, maxw, maxh):
+        mime = Gio.content_type_guess(path, None)[0] if not os.path.isdir(path) else "inode/directory"
+        try:
+            if mime.startswith("image/"):
+                pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, maxw, maxh, True)
+                return Gtk.Image.new_from_pixbuf(pb)
+            if mime == "application/pdf":
+                return self.pdf(path, maxw, maxh)
+            text = self.read_text(path) if not mime.startswith(("audio/", "video/")) else None
+            if text is not None:
+                return self.text(text, maxw, maxh)
+        except Exception as e:                 # 壊れたファイルなどは、情報だけの表示にする
+            print("quicklook:", path, e, file=sys.stderr)
+        return self.info_box(path)
+
+    @staticmethod
+    def read_text(path):
+        """先頭を読んで、テキストなら文字列を返す (拡張子や種類の名前には頼らない)。違えば None。"""
+        with open(path, "rb") as f:
+            data = f.read(64 * 1024)
+        if not data:
+            return ""
+        if b"\0" in data:
+            return None
+        for enc in ("utf-8", "cp932", "euc-jp"):
+            try:
+                return data.decode(enc)
+            except UnicodeDecodeError as e:
+                if enc == "utf-8" and e.start >= len(data) - 4:   # 64 KB の区切りで途切れただけ
+                    return data[:e.start].decode("utf-8")
+        return None
+
+    def text(self, text, maxw, maxh):
+        view = Gtk.TextView(editable=False, cursor_visible=False, monospace=True)
+        view.set_left_margin(12)
+        view.set_right_margin(12)
+        view.get_buffer().set_text(text)
+        sw = Gtk.ScrolledWindow()
+        sw.set_min_content_width(min(720, maxw))
+        sw.set_min_content_height(min(480, maxh))
+        sw.add(view)
+        return sw
+
+    def pdf(self, path, maxw, maxh):
+        gi.require_version("Poppler", "0.18")
+        from gi.repository import Poppler
+        import cairo
+        page = Poppler.Document.new_from_file(Gio.File.new_for_path(path).get_uri(), None).get_page(0)
+        w, h = page.get_size()
+        k = min(maxw / w, maxh / h, 2.0)
+        surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, int(w * k), int(h * k))
+        cr = cairo.Context(surf)
+        cr.set_source_rgb(1, 1, 1)
+        cr.paint()
+        cr.scale(k, k)
+        page.render(cr)
+        return Gtk.Image.new_from_pixbuf(Gdk.pixbuf_get_from_surface(surf, 0, 0, surf.get_width(), surf.get_height()))
+
+
 def main():
     if "--screenshot" in sys.argv:
         return screenshot(sys.argv[sys.argv.index("--screenshot") + 1], sys.argv[sys.argv.index("--screenshot") + 2:])
@@ -748,6 +1080,8 @@ def main():
         signal.SIGRTMIN: L.show_force_quit,
         signal.SIGTERM: Gtk.main_quit,
     }
+    ql = QuickLook()
+    actions[signal.SIGRTMIN + 5] = ql.toggle
     for n, (mode, back) in enumerate((("apps", False), ("apps", True), ("windows", False), ("windows", True)), 1):
         actions[signal.SIGRTMIN + n] = lambda m=mode, b=back: sw.start(m, b)
     for sig, fn in actions.items():

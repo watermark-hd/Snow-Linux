@@ -5,3 +5,4 @@
 (gtk_accel_path "<Actions>/ThunarWindow/open-location" "<Primary><Shift>g")
 (gtk_accel_path "<Actions>/ThunarWindow/empty-trash" "<Primary><Shift>BackSpace")
 (gtk_accel_path "<Actions>/ThunarWindow/show-hidden" "<Primary><Shift>period")
+(gtk_accel_path "<Actions>/ThunarActions/uca-action-1762000000000000-1" "space")
