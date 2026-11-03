@@ -73,9 +73,11 @@ install -m 755 "$root/scripts/snowlinux-screenshot" /usr/local/bin/snowlinux-scr
 install -m 755 "$root/scripts/snowlinux-appmenu" /usr/local/bin/snowlinux-appmenu
 install -m 755 "$root/scripts/snowlinux-switcher" /usr/local/bin/snowlinux-switcher
 install -m 755 "$root/scripts/snowlinux-about" /usr/local/bin/snowlinux-about
+install -m 755 "$root/scripts/snowlinux-software-update" /usr/local/bin/snowlinux-software-update
 install -m 755 "$root/scripts/snowlinux-quicklook" /usr/local/bin/snowlinux-quicklook
 install -m 755 "$root/scripts/snowlinux-display-calibrator" /usr/local/bin/snowlinux-display-calibrator
 install -D -m 644 "$root/config/system/applications/snowlinux-display-calibrator.desktop" /usr/local/share/applications/snowlinux-display-calibrator.desktop
+install -D -m 644 "$root/config/system/applications/snowlinux-software-update.desktop" /usr/local/share/applications/snowlinux-software-update.desktop
 
 # デスクトップの右クリックメニューと Thunar を Mac 風の文言にする (日本語の訳を差し替える)。
 # パッケージの更新で元に戻らないように、元のファイルを dpkg-divert で脇へ退けてから置く

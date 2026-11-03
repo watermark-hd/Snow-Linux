@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Software Update
+Name[ja]=ソフトウェア・アップデート
+Comment[ja]=更新できるソフトウェアを確認して、インストールします
+Exec=snowlinux-software-update
+Icon=system-software-update
+Terminal=false
+Categories=System;Settings;
+Keywords=update;upgrade;apt;更新;アップデート;

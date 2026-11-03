@@ -50,7 +50,7 @@ GROUPS = [
     ("システム", [
         ("accounts", "アカウント", ("desktop", "mx-user.desktop"), "ユーザー パスワード ログイン"),
         ("datetime", "日付と時刻", ("desktop", "mx-datetime.desktop"), "時計 タイムゾーン"),
-        ("update", "ソフトウェア・\nアップデート", ("app", ["mx-updater"]), "更新 アップグレード"),
+        ("update", "ソフトウェア・\nアップデート", ("app", ["snowlinux-software-update"]), "更新 アップグレード"),
         ("timemachine", "バックアップ", ("desktop", "timeshift-gtk.desktop"), "スナップショット 復元 timeshift"),
         ("startup", "起動ディスク", ("desktop", "mx-boot-options.desktop"), "ブート 起動 grub"),
         ("access", "アクセシビリティ", ("embed", ["xfce4-accessibility-settings"]), "ユニバーサルアクセス 見やすさ"),

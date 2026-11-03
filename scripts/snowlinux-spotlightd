@@ -433,7 +433,7 @@ class Launcher:
             m.append(Gtk.SeparatorMenuItem())
 
         add("このコンピュータについて", lambda *_: self.run("snowlinux-about"))
-        add("ソフトウェア・アップデート…", lambda *_: self.run("mx-updater"))
+        add("ソフトウェア・アップデート…", lambda *_: self.run("snowlinux-software-update"))
         sep()
         add("システム環境設定…", lambda *_: self.run("snowlinux-system-preferences"))
         dock = Gtk.Menu()
@@ -780,6 +780,7 @@ class QuickLook:
     def close(self):
         if not self.win:
             return
+        self.stop_media()
         self.win.hide()
         if not self.prev or not self.focusable:
             return
@@ -855,6 +856,7 @@ class QuickLook:
         if self.win is None:
             self.win = self.build_window()
         geo = Gdk.Display.get_default().get_primary_monitor().get_geometry()
+        self.stop_media()
         for child in self.holder.get_children():
             self.holder.remove(child)
         self.path = path
@@ -944,6 +946,7 @@ class QuickLook:
         if self.win is None:
             self.win = self.build_window()
         geo = Gdk.Display.get_default().get_primary_monitor().get_geometry()
+        self.stop_media()
         for child in self.holder.get_children():
             self.holder.remove(child)
         self.path = ""
@@ -1012,12 +1015,137 @@ class QuickLook:
                 return Gtk.Image.new_from_pixbuf(pb)
             if mime == "application/pdf":
                 return self.pdf(path, maxw, maxh)
-            text = self.read_text(path) if not mime.startswith(("audio/", "video/")) else None
+            if mime.startswith(("audio/", "video/")):
+                return self.media(path, maxw, maxh, mime.startswith("video/"))
+            text = self.read_text(path)
             if text is not None:
                 return self.text(text, maxw, maxh)
         except Exception as e:                 # 壊れたファイルなどは、情報だけの表示にする
             print("quicklook:", path, e, file=sys.stderr)
         return self.info_box(path)
+
+    def stop_media(self):
+        for stop in getattr(self, "media_stops", []):
+            stop()
+        self.media_stops = []
+
+    def media(self, path, maxw, maxh, video):
+        """音声・動画。開いたらすぐ再生する。動画の絵は、小さく縮めて受け取って画像として並べる (重い機械でも動くように)。"""
+        gi.require_version("Gst", "1.0")
+        from gi.repository import Gst
+        Gst.init(None)
+        # VA-API の復号器は、画面に直接出す前提で、絵を CPU に取り出すと壊れた (緑一色の) 絵になる。ソフトウェアの復号器を使わせる。
+        for plugin in ("va", "vaapi"):
+            for feat in Gst.Registry.get().get_feature_list_by_plugin(plugin):
+                feat.set_rank(Gst.Rank.NONE)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.set_border_width(8)
+        if video:
+            view = Gtk.Image()
+            view.set_size_request(min(640, maxw), min(360, maxh))
+            box.pack_start(view, True, True, 0)
+        else:
+            box.pack_start(self.info_box(path), True, True, 0)
+        play = Gtk.Button.new_from_icon_name("media-playback-pause-symbolic", Gtk.IconSize.BUTTON)
+        play.set_relief(Gtk.ReliefStyle.NONE)
+        bar = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 1, 1)
+        bar.set_draw_value(False)
+        clock = Gtk.Label(label="0:00")
+        clock.get_style_context().add_class("meta")
+        ctl = Gtk.Box(spacing=8)
+        ctl.pack_start(play, False, False, 0)
+        ctl.pack_start(bar, True, True, 0)
+        ctl.pack_start(clock, False, False, 0)
+        box.pack_start(ctl, False, False, 0)
+
+        pl = Gst.ElementFactory.make("playbin", None)
+        pl.set_property("uri", Gio.File.new_for_path(path).get_uri())
+        latest = [None]
+        if video:
+            # 幅だけ指定すると縦横比が崩れるので、元の大きさと画素の縦横比から、表示の大きさを先に決める
+            gi.require_version("GstPbutils", "1.0")
+            from gi.repository import GstPbutils
+            dw, dh = 16, 9
+            try:
+                info = GstPbutils.Discoverer.new(3 * Gst.SECOND).discover_uri(pl.get_property("uri"))
+                vs = info.get_video_streams()[0]
+                dw, dh = vs.get_width() * max(vs.get_par_num(), 1) / max(vs.get_par_denom(), 1), vs.get_height()
+            except Exception as e:
+                print("quicklook media info:", e, file=sys.stderr)
+            k = min(min(640, maxw) / dw, min(360, maxh) / dh)
+            vw, vh = max(2, int(dw * k) & ~1), max(2, int(dh * k) & ~1)
+            view.set_size_request(vw, vh)
+            sink = Gst.parse_bin_from_description(
+                "videoconvert ! videoscale ! "
+                f"video/x-raw,format=RGB,width={vw},height={vh},pixel-aspect-ratio=1/1 "
+                "! appsink name=sink emit-signals=true max-buffers=1 drop=true sync=true", True)
+            app = sink.get_by_name("sink")
+
+            def show_frame():
+                smp, latest[0] = latest[0], None
+                if smp is not None:
+                    st = smp.get_caps().get_structure(0)
+                    w, h = st.get_value("width"), st.get_value("height")
+                    buf = smp.get_buffer()
+                    data = buf.extract_dup(0, buf.get_size())
+                    view.set_from_pixbuf(GdkPixbuf.Pixbuf.new_from_bytes(
+                        GLib.Bytes.new(data), GdkPixbuf.Colorspace.RGB, False, 8, w, h, (w * 3 + 3) & ~3))
+                return False
+
+            def on_sample(a):
+                idle = latest[0] is None
+                latest[0] = a.emit("pull-sample")
+                if idle:
+                    GLib.idle_add(show_frame)
+                return Gst.FlowReturn.OK
+            app.connect("new-sample", on_sample)
+            pl.set_property("video-sink", sink)
+        state = {"playing": True}
+
+        def fmt(t):
+            sec = int(t // Gst.SECOND)
+            return f"{sec // 60}:{sec % 60:02d}"
+
+        def tick():
+            ok, dur = pl.query_duration(Gst.Format.TIME)
+            ok2, pos = pl.query_position(Gst.Format.TIME)
+            if ok and ok2 and dur > 0:
+                bar.set_range(0, dur / Gst.SECOND)
+                bar.set_value(pos / Gst.SECOND)
+                clock.set_text(f"{fmt(pos)} / {fmt(dur)}")
+            return True
+
+        def set_playing(on):
+            state["playing"] = on
+            pl.set_state(Gst.State.PLAYING if on else Gst.State.PAUSED)
+            play.set_image(Gtk.Image.new_from_icon_name(
+                "media-playback-pause-symbolic" if on else "media-playback-start-symbolic", Gtk.IconSize.BUTTON))
+
+        def seek(_w, _scroll, value):
+            pl.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, int(max(0, value) * Gst.SECOND))
+            return False
+        play.connect("clicked", lambda *_: set_playing(not state["playing"]))
+        bar.connect("change-value", seek)
+        tick_id = GLib.timeout_add(250, tick)
+
+        bus = pl.get_bus()
+        bus.add_signal_watch()
+
+        def on_msg(_b, msg):
+            if msg.type == Gst.MessageType.EOS:
+                pl.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH, 0)
+                set_playing(False)
+            elif msg.type == Gst.MessageType.ERROR:
+                print("quicklook media:", msg.parse_error()[0].message, file=sys.stderr)
+        bus.connect("message", on_msg)
+
+        def stop():
+            GLib.source_remove(tick_id)
+            bus.remove_signal_watch()
+            pl.set_state(Gst.State.NULL)
+        self.media_stops = getattr(self, "media_stops", []) + [stop]
+        pl.set_state(Gst.State.PLAYING)
+        return box
 
     @staticmethod
     def read_text(path):
