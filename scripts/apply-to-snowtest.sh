@@ -81,13 +81,21 @@ install -D -m 644 "$root/config/system/applications/snowlinux-software-update.de
 
 # デスクトップの右クリックメニューと Thunar を Mac 風の文言にする (日本語の訳を差し替える)。
 # パッケージの更新で元に戻らないように、元のファイルを dpkg-divert で脇へ退けてから置く
-for domain in xfdesktop thunar; do
+for domain in xfdesktop thunar plank; do
     mo=/usr/share/locale/ja/LC_MESSAGES/$domain.mo
     if ! dpkg-divert --list "$mo" | grep -q .; then
         dpkg-divert --local --rename --divert "$mo.orig" --add "$mo" >/dev/null
     fi
     python3 "$root/scripts/build-mac-ja.py" "$domain" "$mo" --from "$mo.orig"
 done
+
+# Firefox: タブを窓の一番上の段に入れて、縦の領域を広く使う。
+# 上のメニューバーに Firefox のメニューを出す設定 (widget.gtk.global-menu.enabled) は、今は入れない。
+# 出るが、1 秒に 2 回ほどメニューが作り直されて、開いたメニューが引っ込んでしまう (docs/history.md を参照)
+if [ -d /opt/firefox/defaults/pref ]; then
+    rm -f /opt/firefox/defaults/pref/snowlinux-globalmenu.js
+    printf '%s\n' 'pref("browser.tabs.inTitlebar", 1);' > /opt/firefox/defaults/pref/snowlinux.js
+fi
 
 # 「アプリケーション」フォルダ (システム全体で共通。実際のインストールでは、パッケージの更新のたびに作り直す)
 python3 "$root/scripts/gen-applications-folder.py" /Applications

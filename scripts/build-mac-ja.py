@@ -2,7 +2,7 @@
 """Xfce のアプリの日本語の訳を、Mac 風の文言に差し替えた .mo を作る。
 
 Xfce のデスクトップのメニューや Thunar の項目は、追加や並べ替えができないので、訳を差し替えて Mac に寄せる。
-使い方: build-mac-ja.py ドメイン(xfdesktop / thunar) 出力先.mo [--from 元の.mo]
+使い方: build-mac-ja.py ドメイン(xfdesktop / thunar / plank) 出力先.mo [--from 元の.mo]
         元は、初めはシステムの ja の .mo。"""
 import gettext
 import struct
@@ -54,7 +54,20 @@ THUNAR = {
     "Folder": "フォルダ",
 }
 
-TABLES = {"xfdesktop": XFDESKTOP, "thunar": THUNAR}
+# Dock (Plank) のゴミ箱。個数の言い方は単数・複数を持つ訳なので、「単数形\0複数形」の形も入れておく
+PLANK = {
+    "No items in Trash": "ゴミ箱は空です",
+    "%u item in Trash": "ゴミ箱に %u 項目",
+    "%u items in Trash": "ゴミ箱に %u 項目",
+    "%u item in Trash\0%u items in Trash": "ゴミ箱に %u 項目",
+    "Empty _Trash": "ゴミ箱を空にする(_E)",
+    "_Open Trash": "ゴミ箱を開く(_O)",
+    "Empty all items from Trash?": "ゴミ箱の中の項目を、すべて削除しますか?",
+    "All items in the Trash will be permanently deleted.": "ゴミ箱の中の項目は、完全に削除されます。この操作は取り消せません。",
+    "Drop to move to Trash": "ここに置くとゴミ箱に入れます",
+}
+
+TABLES = {"xfdesktop": XFDESKTOP, "thunar": THUNAR, "plank": PLANK}
 
 
 def write_mo(catalog, path):
@@ -83,6 +96,8 @@ def main():
     t = gettext.GNUTranslations(open(src, "rb"))
     cat = {k: v for k, v in t._catalog.items() if isinstance(k, str)}
     cat.update(TABLES[domain])
+    if "Plural-Forms" not in cat.get("", ""):      # 日本語は単数・複数の区別がない (元の .mo に書かれていないことがある)
+        cat[""] = cat.get("", "") + "Plural-Forms: nplurals=1; plural=0;\n"
     write_mo(cat, out)
 
 
