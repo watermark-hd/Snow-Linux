@@ -1,0 +1,446 @@
+#!/usr/bin/env python3
+"""メニューバーの仲介 (Firefox など、メニューを頻繁に作り直すアプリのため)。
+
+Firefox は、中身が変わっていなくても「メニューが変わった」(LayoutUpdated) を 1 秒に何度も送る。
+上のメニューバーは、それが来るたびにメニューを作り直すので、開いたメニューが閉じてしまう。
+そこで、Firefox のメニューを、いったんここで受けて、中身が本当に変わったときだけ、
+「変わった」を上のメニューバーに伝える。メニューバー側には、Firefox の代わりにここが見える。
+
+しくみ:
+  - 標準の窓の登録係 (appmenu-registrar) の代わりに、ここが登録係 (com.canonical.AppMenu.Registrar) になる
+  - Firefox 系が登録したメニューは、ここで写し (Mirror) を作り、写しのほうを上のメニューバーに渡す
+    (Firefox は、登録を繰り返して取り返そうとするので、同じ登録の繰り返しは、無視する)
+  - 写しは、問い合わせ (GetLayout など) を Firefox に取り次ぐ。ふだんの GetLayout は、控えから答える。
+    Event (項目を押した) も取り次ぐ。控えと中身が変わったときだけ、LayoutUpdated を出す
+  - そのほかのアプリは、登録をそのまま渡す
+
+使い方: snowlinux-menuproxy        (D-Bus の呼び出しで自動で起動する。画面には何も出ない)
+"""
+import os
+import sys
+
+import gi
+
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib  # noqa: E402
+
+REGISTRAR = "com.canonical.AppMenu.Registrar"
+REGISTRAR_PATH = "/com/canonical/AppMenu/Registrar"
+REGISTRAR_IFACE = "com.canonical.AppMenu.Registrar"
+DBUSMENU = "com.canonical.dbusmenu"
+# 中身が同じなのに、作り直しの知らせを何度も送るアプリ (プロセスの名前)
+WRAPPED = {"firefox", "firefox-bin", "firefox-esr", "thunderbird", "thunderbird-bin"}
+DEBOUNCE_MS = 300
+
+XML = """
+<node>
+  <interface name="com.canonical.dbusmenu">
+    <method name="GetLayout">
+      <arg type="i" name="parentId" direction="in"/>
+      <arg type="i" name="recursionDepth" direction="in"/>
+      <arg type="as" name="propertyNames" direction="in"/>
+      <arg type="u" name="revision" direction="out"/>
+      <arg type="(ia{sv}av)" name="layout" direction="out"/>
+    </method>
+    <method name="GetGroupProperties">
+      <arg type="ai" name="ids" direction="in"/>
+      <arg type="as" name="propertyNames" direction="in"/>
+      <arg type="a(ia{sv})" name="properties" direction="out"/>
+    </method>
+    <method name="GetProperty">
+      <arg type="i" name="id" direction="in"/>
+      <arg type="s" name="name" direction="in"/>
+      <arg type="v" name="value" direction="out"/>
+    </method>
+    <method name="Event">
+      <arg type="i" name="id" direction="in"/>
+      <arg type="s" name="eventId" direction="in"/>
+      <arg type="v" name="data" direction="in"/>
+      <arg type="u" name="timestamp" direction="in"/>
+    </method>
+    <method name="EventGroup">
+      <arg type="a(isvu)" name="events" direction="in"/>
+      <arg type="ai" name="idErrors" direction="out"/>
+    </method>
+    <method name="AboutToShow">
+      <arg type="i" name="id" direction="in"/>
+      <arg type="b" name="needUpdate" direction="out"/>
+    </method>
+    <method name="AboutToShowGroup">
+      <arg type="ai" name="ids" direction="in"/>
+      <arg type="ai" name="updatesNeeded" direction="out"/>
+      <arg type="ai" name="idErrors" direction="out"/>
+    </method>
+    <signal name="ItemsPropertiesUpdated">
+      <arg type="a(ia{sv})" name="updatedProps"/>
+      <arg type="a(ias)" name="removedProps"/>
+    </signal>
+    <signal name="LayoutUpdated">
+      <arg type="u" name="revision"/>
+      <arg type="i" name="parent"/>
+    </signal>
+    <signal name="ItemActivationRequested">
+      <arg type="i" name="id"/>
+      <arg type="u" name="timestamp"/>
+    </signal>
+    <property name="Version" type="u" access="read"/>
+    <property name="TextDirection" type="s" access="read"/>
+    <property name="Status" type="s" access="read"/>
+    <property name="IconThemePath" type="as" access="read"/>
+  </interface>
+</node>
+"""
+INFO = Gio.DBusNodeInfo.new_for_xml(XML).interfaces[0]
+
+OUT_TYPES = {
+    "GetLayout": "(u(ia{sv}av))", "GetGroupProperties": "(a(ia{sv}))", "GetProperty": "(v)",
+    "Event": "()", "EventGroup": "(ai)", "AboutToShow": "(b)", "AboutToShowGroup": "(aiai)",
+}
+
+
+def log(msg):
+    if os.environ.get("SNOW_DEBUG"):
+        print("menuproxy:", msg, file=sys.stderr, flush=True)
+
+
+class Mirror:
+    """1 つの窓のメニューの写し。元 (Firefox) の知らせを受けて、変わったときだけ、自分の知らせを出す。"""
+
+    def __init__(self, registrar, window_id, service, path):
+        self.window_id, self.service, self.path = window_id, service, path
+        self.my_path = f"/com/snowlinux/menuproxy/w{window_id}"
+        self.conn = registrar.conn
+        self.revision = 1
+        self.layout = None            # 控え: GetLayout(0, -1, []) の layout 部分
+        self.layout_text = ""
+        self.timer = 0
+        self.ids = {(): 0}            # 位置 (何番目の何番目…) → こちらの固定の番号。Firefox は番号を付け直すので、位置で決める
+        self.s2r, self.r2s, self.s2path = {0: 0}, {0: 0}, {0: ()}
+        self.warmed = set()           # 先に一度「開いた」サブメニューの位置
+        self.warm_rounds = 0
+        self.reg_id = self.conn.register_object(self.my_path, INFO, self.on_call, self.on_get_property, None)
+        self.sub = self.conn.signal_subscribe(service, DBUSMENU, None, path, None,
+                                              Gio.DBusSignalFlags.NONE, self.on_source_signal)
+        self.refresh()
+
+    def close(self):
+        if self.timer:
+            GLib.source_remove(self.timer)
+        self.conn.signal_unsubscribe(self.sub)
+        self.conn.unregister_object(self.reg_id)
+
+    # 元からの知らせ: 少し待って、まとめて 1 回だけ調べ直す
+    def on_source_signal(self, _c, _s, _p, _i, name, _params):
+        if name in ("LayoutUpdated", "ItemsPropertiesUpdated") and not self.timer:
+            self.timer = GLib.timeout_add(DEBOUNCE_MS, self.refresh)
+
+    def stable(self, node, path, s2r, r2s):
+        """layout の番号を、固定の番号に付け替える。s2r / r2s に、元の番号との対応を書き込む。"""
+        real = node.get_child_value(0).get_int32()
+        sid = self.ids.setdefault(path, len(self.ids))
+        s2r[sid], r2s[real] = real, sid
+        self.s2path[sid] = path
+        kids = node.get_child_value(2)
+        out = []
+        for i in range(kids.n_children()):
+            kid = kids.get_child_value(i)
+            while kid.get_type_string() == "v":
+                kid = kid.get_variant()
+            out.append(self.stable(kid, path + (i,), s2r, r2s))
+        return GLib.Variant.new_tuple(GLib.Variant("i", sid), node.get_child_value(1),
+                                      GLib.Variant("av", out))
+
+    @staticmethod
+    def hollow(node):
+        """サブメニューのはずなのに、中身がまだ無い項目か。"""
+        props = node.get_child_value(1).unpack()
+        return props.get("children-display") == "submenu" and node.get_child_value(2).n_children() == 0
+
+    @staticmethod
+    def child(node, i):
+        k = node.get_child_value(2).get_child_value(i)
+        while k.get_type_string() == "v":
+            k = k.get_variant()
+        return k
+
+    def node_at(self, sid):
+        """控えの中の、固定の番号 sid の項目。無ければ None。"""
+        path = self.s2path.get(sid)
+        if path is None or self.layout is None:
+            return None
+        node = self.layout
+        for i in path:
+            if i >= node.get_child_value(2).n_children():
+                return None
+            node = self.child(node, i)
+        return node if node.get_child_value(0).get_int32() == sid else None
+
+    def prune(self, node, depth):
+        """depth 段より下を切り落とした写し (-1 は全部)。"""
+        kids = []
+        if depth != 0:
+            kids = [self.prune(self.child(node, i), depth - 1) for i in range(node.get_child_value(2).n_children())]
+        return GLib.Variant.new_tuple(node.get_child_value(0), node.get_child_value(1), GLib.Variant("av", kids))
+
+    def warm(self):
+        """まだ中身の無いサブメニューを、こちらで一度「開いて」、Firefox に中身を入れさせる。
+        上のバーは、開く前に中身を取りに来るので、空のままだと、細い (中身の無い) メニューが出てしまう。"""
+        todo = []
+
+        def walk(node, path):
+            if self.hollow(node) and path not in self.warmed:
+                todo.append((path, node.get_child_value(0).get_int32()))
+            for i in range(node.get_child_value(2).n_children()):
+                walk(self.child(node, i), path + (i,))
+        walk(self.layout, ())
+        if not todo or self.warm_rounds >= 4:     # サブメニューの中のサブメニューは、外が埋まってから見える。4 段まで
+            return
+        self.warm_rounds += 1
+        log(f"窓 {self.window_id}: 先に開く {len(todo)} 個 (回目 {self.warm_rounds})")
+        for path, sid in todo:
+            self.warmed.add(path)
+            for ev in ("opened", "closed"):
+                self.conn.call(self.service, self.path, DBUSMENU, "Event",
+                               GLib.Variant("(isvu)", (self.to_real(sid), ev, GLib.Variant("i", 0), 0)),
+                               None, Gio.DBusCallFlags.NONE, 5000, None, None)
+        if not self.timer:
+            self.timer = GLib.timeout_add(500, self.refresh)
+
+    def to_real(self, i):
+        return self.s2r.get(i, i)
+
+    def to_stable(self, i):
+        return self.r2s.get(i, i)
+
+    def refresh(self):
+        self.timer = 0
+        self.conn.call(self.service, self.path, DBUSMENU, "GetLayout",
+                       GLib.Variant("(iias)", (0, -1, [])), GLib.VariantType("(u(ia{sv}av))"),
+                       Gio.DBusCallFlags.NONE, 5000, None, self.on_layout)
+        return False
+
+    def on_layout(self, conn, res):
+        try:
+            reply = conn.call_finish(res)
+        except GLib.Error as e:
+            print("menuproxy: GetLayout:", e.message, file=sys.stderr)
+            return
+        s2r, r2s = {0: 0}, {0: 0}
+        layout = self.stable(reply.get_child_value(1), (), s2r, r2s)
+        self.s2r, self.r2s = s2r, r2s
+        text = self.top_text(layout)
+        first = self.layout is None
+        self.layout = layout                  # 控えは、いつも最新にする
+        self.warm()
+        if text == self.layout_text:
+            return                                        # 一番上の並びが同じ: 知らせない
+        self.layout_text = text
+        if not first:
+            self.revision += 1
+            log(f"窓 {self.window_id}: 一番上の並びが変わった → LayoutUpdated rev={self.revision}")
+            self.conn.emit_signal(None, self.my_path, DBUSMENU, "LayoutUpdated",
+                                  GLib.Variant("(ui)", (self.revision, 0)))
+
+    @staticmethod
+    def top_text(layout):
+        """一番上の並び (ファイル・編集・表示…) だけの文字。中のメニューは、開くたびに聞き直されるので、
+        Firefox が中身を入れ替えても、知らせない (知らせると、開いているメニューが作り直される)。"""
+        kids = layout.get_child_value(2)
+        out = []
+        for i in range(kids.n_children()):
+            k = kids.get_child_value(i)
+            while k.get_type_string() == "v":
+                k = k.get_variant()
+            out.append((k.get_child_value(0).get_int32(), k.get_child_value(1).print_(False)))
+        return repr(out)
+
+    @staticmethod
+    def on_get_property(_c, _s, _p, _i, name):
+        return {"Version": GLib.Variant("u", 3), "TextDirection": GLib.Variant("s", "ltr"),
+                "Status": GLib.Variant("s", "normal"), "IconThemePath": GLib.Variant("as", [])}.get(name)
+
+    def on_call(self, _c, _sender, _p, _i, method, params, invocation):
+        if method == "GetLayout" and self.layout is not None:
+            parent, depth, _names = params.unpack()
+            node = self.node_at(parent)               # 控えに中身があれば、待たずに控えから答える
+            if node is not None and (depth == 0 or not self.hollow(node)):
+                invocation.return_value(GLib.Variant.new_tuple(GLib.Variant("u", self.revision), self.prune(node, depth)))
+                return
+        log(f"窓 {self.window_id}: 取り次ぎ {method} {params.print_(False)[:80]}")
+        sparent = None
+        if method == "GetLayout":
+            sparent = params.get_child_value(0).get_int32()
+            params = GLib.Variant.new_tuple(GLib.Variant("i", self.to_real(sparent)),
+                                            params.get_child_value(1), params.get_child_value(2))
+        elif method in ("GetProperty", "AboutToShow", "Event"):
+            first = GLib.Variant("i", self.to_real(params.get_child_value(0).get_int32()))
+            params = GLib.Variant.new_tuple(first, *[params.get_child_value(k) for k in range(1, params.n_children())])
+        elif method == "AboutToShowGroup":
+            params = GLib.Variant.new_tuple(GLib.Variant("ai", [self.to_real(i) for i in params.get_child_value(0).unpack()]))
+        elif method == "GetGroupProperties":
+            params = GLib.Variant.new_tuple(GLib.Variant("ai", [self.to_real(i) for i in params.get_child_value(0).unpack()]),
+                                            params.get_child_value(1))
+        elif method == "EventGroup":
+            evs = [GLib.Variant.new_tuple(GLib.Variant("i", self.to_real(e.get_child_value(0).get_int32())),
+                                          *[e.get_child_value(k) for k in range(1, 4)])
+                   for e in (params.get_child_value(0).get_child_value(j) for j in range(params.get_child_value(0).n_children()))]
+            params = GLib.Variant.new_tuple(GLib.Variant("a(isvu)", evs))
+
+        tries = [0]
+
+        def done(conn, res):
+            try:
+                reply = conn.call_finish(res)
+            except GLib.Error as e:
+                invocation.return_dbus_error("org.freedesktop.DBus.Error.Failed", e.message)
+                return
+            if method == "GetLayout" and sparent and tries[0] < 4 and self.hollow(reply.get_child_value(1)):
+                tries[0] += 1             # Firefox は「開く」を受けてから中身を入れる。入るまで少し待って、聞き直す
+                GLib.timeout_add(100, lambda: self.conn.call(
+                    self.service, self.path, DBUSMENU, method, params, GLib.VariantType(OUT_TYPES[method]),
+                    Gio.DBusCallFlags.NONE, 5000, None, done) and False)
+                return
+            if method == "GetLayout":                 # 番号は固定のものに、版はこちらの数に付け替える
+                node = self.stable(reply.get_child_value(1), self.s2path.get(sparent, ()), self.s2r, self.r2s)
+                reply = GLib.Variant.new_tuple(GLib.Variant("u", self.revision), node)
+            elif method == "AboutToShowGroup":
+                reply = GLib.Variant.new_tuple(
+                    GLib.Variant("ai", [self.to_stable(i) for i in reply.get_child_value(0).unpack()]),
+                    GLib.Variant("ai", [self.to_stable(i) for i in reply.get_child_value(1).unpack()]))
+            elif method == "EventGroup":
+                reply = GLib.Variant.new_tuple(
+                    GLib.Variant("ai", [self.to_stable(i) for i in reply.get_child_value(0).unpack()]))
+            elif method == "GetGroupProperties":
+                items = [GLib.Variant.new_tuple(GLib.Variant("i", self.to_stable(it.get_child_value(0).get_int32())),
+                                                it.get_child_value(1))
+                         for it in (reply.get_child_value(0).get_child_value(j)
+                                    for j in range(reply.get_child_value(0).n_children()))]
+                reply = GLib.Variant.new_tuple(GLib.Variant("a(ia{sv})", items))
+            log(f"窓 {self.window_id}: 答え {method} {reply.print_(False)[:80]}")
+            invocation.return_value(reply)
+        self.conn.call(self.service, self.path, DBUSMENU, method, params, GLib.VariantType(OUT_TYPES[method]),
+                       Gio.DBusCallFlags.NONE, 5000, None, done)
+
+
+REGISTRAR_XML = """
+<node>
+  <interface name="com.canonical.AppMenu.Registrar">
+    <method name="RegisterWindow">
+      <arg type="u" name="windowId" direction="in"/>
+      <arg type="o" name="menuObjectPath" direction="in"/>
+    </method>
+    <method name="UnregisterWindow">
+      <arg type="u" name="windowId" direction="in"/>
+    </method>
+    <method name="GetMenuForWindow">
+      <arg type="u" name="windowId" direction="in"/>
+      <arg type="s" name="service" direction="out"/>
+      <arg type="o" name="menuObjectPath" direction="out"/>
+    </method>
+    <method name="GetMenus">
+      <arg type="a(uso)" name="menus" direction="out"/>
+    </method>
+    <signal name="WindowRegistered">
+      <arg type="u" name="windowId"/>
+      <arg type="s" name="service"/>
+      <arg type="o" name="menuObjectPath"/>
+    </signal>
+    <signal name="WindowUnregistered">
+      <arg type="u" name="windowId"/>
+    </signal>
+  </interface>
+  <interface name="org.valapanel.AppMenu.Registrar">
+    <method name="Reference"/>
+    <method name="UnReference"/>
+  </interface>
+</node>
+"""
+REGISTRAR_INFO = Gio.DBusNodeInfo.new_for_xml(REGISTRAR_XML)
+
+
+class Registrar:
+    """窓の登録係 (標準の appmenu-registrar の代わり)。登録されたメニューを、そのまま上のメニューバーに渡す。
+    ただし、Firefox などは、控えを持つ写し (Mirror) を代わりに渡す。"""
+
+    def __init__(self):
+        self.conn = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        self.windows = {}            # 窓の ID → (元の service, 元の path, 渡す service, 渡す path)
+        self.mirrors = {}            # 窓の ID → Mirror
+        for iface in REGISTRAR_INFO.interfaces:
+            path = REGISTRAR_PATH if iface.name == REGISTRAR_IFACE else "/org/valapanel/AppMenu/Registrar"
+            self.conn.register_object(path, iface, self.on_call, None, None)
+        self.conn.signal_subscribe("org.freedesktop.DBus", "org.freedesktop.DBus", "NameOwnerChanged",
+                                   "/org/freedesktop/DBus", None, Gio.DBusSignalFlags.NONE, self.on_owner_changed)
+        Gio.bus_own_name_on_connection(self.conn, REGISTRAR, Gio.BusNameOwnerFlags.NONE, None,
+                                       lambda *_: sys.exit("menuproxy: 登録係の名前を取れませんでした (すでに別の登録係が動いている)"))
+
+    def effective(self, wid):
+        w = self.windows[wid]
+        return w[2], w[3]
+
+    def on_call(self, conn, sender, _p, iface, method, params, invocation):
+        if iface != REGISTRAR_IFACE:
+            invocation.return_value(None)             # Reference / UnReference は、何もしない
+        elif method == "RegisterWindow":
+            wid, path = params.unpack()
+            self.register(wid, sender, path)
+            invocation.return_value(None)
+        elif method == "UnregisterWindow":
+            self.unregister(params.unpack()[0])
+            invocation.return_value(None)
+        elif method == "GetMenuForWindow":
+            wid = params.unpack()[0]
+            if wid in self.windows:
+                invocation.return_value(GLib.Variant("(so)", self.effective(wid)))
+            else:                                     # 標準の登録係は、未登録の窓にはエラーでなく空を返す (エラーだとプラグインが落ちる)
+                invocation.return_value(GLib.Variant("(so)", ("", "/")))
+        elif method == "GetMenus":
+            invocation.return_value(GLib.Variant("(a(uso))", ([(w, *self.effective(w)) for w in self.windows],)))
+
+    def register(self, wid, service, path):
+        log(f"登録: 窓 {wid} {service} {path}")
+        old = self.windows.get(wid)
+        if old and old[:2] == (service, path):
+            return                                    # 同じ登録の繰り返し。知らせない (Firefox は、繰り返す)
+        mirror = self.mirrors.pop(wid, None)
+        if mirror:
+            mirror.close()
+        eff = (service, path)
+        if self.process_name(service) in WRAPPED:
+            m = self.mirrors[wid] = Mirror(self, wid, service, path)
+            eff = (self.conn.get_unique_name(), m.my_path)
+        self.windows[wid] = (service, path, *eff)
+        self.conn.emit_signal(None, REGISTRAR_PATH, REGISTRAR_IFACE, "WindowRegistered",
+                              GLib.Variant("(uso)", (wid, *eff)))
+
+    def unregister(self, wid):
+        if self.windows.pop(wid, None) is None:
+            return
+        mirror = self.mirrors.pop(wid, None)
+        if mirror:
+            mirror.close()
+        self.conn.emit_signal(None, REGISTRAR_PATH, REGISTRAR_IFACE, "WindowUnregistered", GLib.Variant("(u)", (wid,)))
+
+    def on_owner_changed(self, _c, _s, _p, _i, _n, params):
+        name, _old, new = params.unpack()
+        if not new:                                   # アプリが終わった: そのアプリの窓を外す
+            for wid in [w for w, v in self.windows.items() if v[0] == name]:
+                self.unregister(wid)
+
+    def process_name(self, service):
+        try:
+            pid = self.conn.call_sync("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+                                      "GetConnectionUnixProcessID", GLib.Variant("(s)", (service,)),
+                                      GLib.VariantType("(u)"), Gio.DBusCallFlags.NONE, 2000, None).unpack()[0]
+            return os.path.basename(os.readlink(f"/proc/{pid}/exe"))
+        except (GLib.Error, OSError):
+            return ""
+
+
+def main():
+    Registrar()
+    GLib.MainLoop().run()
+
+
+if __name__ == "__main__":
+    main()

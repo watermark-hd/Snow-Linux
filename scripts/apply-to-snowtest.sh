@@ -73,6 +73,10 @@ install -m 755 "$root/scripts/snowlinux-screenshot" /usr/local/bin/snowlinux-scr
 install -m 755 "$root/scripts/snowlinux-appmenu" /usr/local/bin/snowlinux-appmenu
 install -m 755 "$root/scripts/snowlinux-switcher" /usr/local/bin/snowlinux-switcher
 install -m 755 "$root/scripts/snowlinux-about" /usr/local/bin/snowlinux-about
+install -m 755 "$root/scripts/snowlinux-menuproxy" /usr/local/bin/snowlinux-menuproxy
+# 窓の登録係の差し替え (D-Bus の呼び出しで起動する。--reset でなくても反映する)
+install -D -m 644 -o "$user" -g "$user" "$root/config/skel/.local/share/dbus-1/services/com.canonical.AppMenu.Registrar.service" \
+    "/home/$user/.local/share/dbus-1/services/com.canonical.AppMenu.Registrar.service"
 install -m 755 "$root/scripts/snowlinux-software-update" /usr/local/bin/snowlinux-software-update
 install -m 755 "$root/scripts/snowlinux-quicklook" /usr/local/bin/snowlinux-quicklook
 install -m 755 "$root/scripts/snowlinux-display-calibrator" /usr/local/bin/snowlinux-display-calibrator
@@ -89,12 +93,12 @@ for domain in xfdesktop thunar plank; do
     python3 "$root/scripts/build-mac-ja.py" "$domain" "$mo" --from "$mo.orig"
 done
 
-# Firefox: タブを窓の一番上の段に入れて、縦の領域を広く使う。
-# 上のメニューバーに Firefox のメニューを出す設定 (widget.gtk.global-menu.enabled) は、今は入れない。
-# 出るが、1 秒に 2 回ほどメニューが作り直されて、開いたメニューが引っ込んでしまう (docs/history.md を参照)
+# Firefox: メニューを上のメニューバーに出し (初期値は切れている)、タブを窓の一番上の段に入れる。
+# 上のメニューバーの作り直しで、開いたメニューが引っ込むので、窓の登録係を自前の snowlinux-menuproxy に差し替えている
+# (skel の dbus-1/services が、標準の登録係より先に使われる。docs/history.md を参照)
 if [ -d /opt/firefox/defaults/pref ]; then
     rm -f /opt/firefox/defaults/pref/snowlinux-globalmenu.js
-    printf '%s\n' 'pref("browser.tabs.inTitlebar", 1);' > /opt/firefox/defaults/pref/snowlinux.js
+    printf '%s\n' 'pref("widget.gtk.global-menu.enabled", true);' 'pref("browser.tabs.inTitlebar", 1);' > /opt/firefox/defaults/pref/snowlinux.js
 fi
 
 # 「アプリケーション」フォルダ (システム全体で共通。実際のインストールでは、パッケージの更新のたびに作り直す)
